@@ -544,21 +544,22 @@ class web_dwc2:
 
 				return in_
 
+			#	get 4k lines from file
+			with open(path_, 'rb') as f:
+				cont_ = f.readlines()			#	gimme the whole file
+			
+			int_ = cont_[:2000] + cont_[-2000:] # 	build up header and footer
+
 			#	determine slicer
 			hit_sl = -1
 			for s_ in slicers:
 				#	resource gunner ?
-				if s_ in open(path_).read():
+				if s_ in int_:
 					meta['slicer'] = s_
 					hit_sl = slicers.index(s_)
 
 			#	only grab metadata if we found a slicer
 			if hit_sl > -1 :
-
-				with open(path_, 'rb') as f:
-
-					cont_ = f.readlines()			#	gimme the whole file
-					int_ = cont_[:1000] + cont_[-1000:] # 	build up header and footer
 
 				#	itter over the lines
 				for lin_ in int_:
@@ -886,7 +887,7 @@ class web_dwc2:
 		def manage_print_data():
 
 			#	init print data on started print
-			if self.print_data:
+			if not self.print_data:
 
 				lz_ = gcode_stats['last_zpos']
 
