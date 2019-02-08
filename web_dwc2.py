@@ -1062,9 +1062,9 @@ class web_dwc2:
 
 		tool = params['P']
 		temp = max(self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.))	#	not fully get this - John
-		command_ = "M104 T%d S%0.2f" % (int(tool),float(temp))
+		command_ = "M104 T%d S%0.2f" % (int(tool)-1,float(temp))
 		
-		return [ command_ ]
+		return command_
 
 	#	rrf M0 - cancel print from sd
 	def cmd_M0(self, params):
@@ -1177,7 +1177,7 @@ class web_dwc2:
 			}
 
 			#	filter crap and implement em step by step. 
-			supported_gcode = [ "G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M98", "M106", "M112", "M220", "M221", \
+			supported_gcode = [ "G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M98", "M106", "M112", "M140", "M220", "M221", \
 					"M290", "M999", "STATUS", "RESTART", "FIRMWARE_RESTART" ]
 
 			#	midprint ecxecutions directly to klippy
