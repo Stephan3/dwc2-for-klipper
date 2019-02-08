@@ -14,11 +14,12 @@ For testing its sitting on root user, this will change once this here will be pu
 ```
 git clone https://github.com/Stephan3/klipper.git
 git clone https://{your_git_user_here}@github.com/Stephan3/dwc2-for-klipper.git
-ln -s dwc2-for-klipper/web_dwc2.py klipper/klippy/extras/web_dwc2.py
+ln -s /root/dwc2-for-klipper/web_dwc2.py /root/klipper/klippy/extras/web_dwc2.py
 mkdir -p /root/sdcard/dwc2/web 
 cd /root/sdcard/dwc2/web 
 wget -q  https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
+/usr/bin/python2 /root/klipper/klippy/klippy.py /root/printer.cfg
 ```
 
 Klipper config example:
