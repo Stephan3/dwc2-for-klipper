@@ -48,7 +48,7 @@ class web_dwc2:
 		self.klipper_config = self.printer.get_start_args()['config_file']
 		con_ = self.configfile.read_main_config()
 		self.sdpath = con_.getsection("virtual_sdcard").get("path", None)
-		if self.sdpath == None:
+		if not self.sdpath:
 			logging.error( "DWC2 failed to start, no sdcard configured" )
 			return
 		self.kin_name = con_.getsection("printer").get("kinematics")
@@ -886,7 +886,7 @@ class web_dwc2:
 		def manage_print_data():
 
 			#	init print data on started print
-			if self.print_data == None:
+			if self.print_data:
 
 				lz_ = gcode_stats['last_zpos']
 
@@ -965,7 +965,7 @@ class web_dwc2:
 				"currentTool": -1 ,
 				"params": {
 					"atxPower": 0 ,
-					"fanPercent": [ fan_['speed'] for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
+					"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
 					"fanNames": [ "", "", "", "", "", "", "", "", "" ],
 					"speedFactor": gcode_stats['speed_factor'] * 100,
 					"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
