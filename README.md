@@ -19,6 +19,7 @@ mkdir -p /root/sdcard/dwc2/web
 cd /root/sdcard/dwc2/web 
 wget -q  https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
+/usr/bin/python2 /root/klipper/klippy/klippy.py /root/printer.cfg
 ```
 
 Klipper config example:
