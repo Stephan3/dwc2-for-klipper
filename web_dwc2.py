@@ -1097,15 +1097,19 @@ class web_dwc2:
 
 		if not os.path.exists(path):
 			#	now we know its no macro file
-			klipper_macro = params['#original'].split("/")[2].replace("\"", "")
-			return klipper_macro
+			klipma = params['#original'].split("/")[2].replace("\"", "")
+			self.gcode_queue.append(klipma)
+			return 0
 
 		else:
 			#	now we know its a macro from dwc
 			with open( path ) as f:
-				lines = f.read().splitlines()
+				lines = f.readlines()
 
-			return "\n".join(lines) + "\n"
+			for com_ in [x.strip() for x in lines]:
+				self.gcode_queue.append( com_ )
+
+			return 0
 
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
@@ -1194,8 +1198,9 @@ class web_dwc2:
 			}
 
 			#	handle unsupported commands
-			if params['#command'].upper() not in supported_gcode:
+			if params['#command'].upper() not in supported_gcode and params['#command'] in self.klipper_macros:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
+				import pdb; pdb.set_trace()
 				continue
 
 			#	if we are midprint, do it directly to klippers object without gcode_queue
@@ -1218,12 +1223,10 @@ class web_dwc2:
 
 			commands.append(command)
 
-		try:
+		if commands:
 			logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
 			self.gcode_queue = []
 			self.gcode.process_commands( commands )
-		except Exception as e:
-			logging.exception( "DWC2 - gcode execution eror" + str(e) )
 
 		#import pdb; pdb.set_trace()
 
