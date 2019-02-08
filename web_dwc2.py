@@ -221,7 +221,7 @@ class web_dwc2:
 			elif "rr_reply" in self.request.uri:
 				if len( self.web_dwc2.gcode_reply ) > 0 :
 					repl_ = self.web_dwc2.gcode_reply.pop(0)
-					logging.debug( "handover gcode_reply to webif: " + repl_ )
+					logging.debug( "handover gcode_reply to webif: " + str(repl_) )
 					self.write( repl_ )
 				return
 					# status requests for machine data
@@ -1154,15 +1154,16 @@ class web_dwc2:
 				else:
 					self.gcode_reply.append("!! Command >> %s << can not run as klipper is not ready !!" % command )
 
-		while self.gcode_queue:
+		now = self.reactor.monotonic()
+		commands = []
 
-			now = self.reactor.monotonic()
+		for com_ in self.gcode_queue :
 
 			# cover emergencys just do it now!!
 			if len([ True for s in self.gcode_queue if "M112".lower() in s.lower() ]) > 0:
 				self.cmd_M112("1")
 
-			command = self.gcode_queue.pop(0).replace(" \"0:","")
+			command = com_.replace(" \"0:","")
 			params = self.parse_params(command)
 			params['#command'] = params['#command'].split(" ")[0]
 
@@ -1177,8 +1178,9 @@ class web_dwc2:
 			}
 
 			#	filter crap and implement em step by step. 
-			supported_gcode = [ "G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M220", "M221", \
-					"M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
+			supported_gcode = [ 
+				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M220",
+				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
 
 			#	midprint ecxecutions directly to klippy
 			mid_print_allow = {
@@ -1195,31 +1197,37 @@ class web_dwc2:
 			#	handle unsupported commands
 			if params['#command'].upper() not in supported_gcode:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
-				return
+				self.gcode_queue.pop( self.gcode_queue.index(com_) )
+				continue
 
 			#	if we are midprint, do it directly to klippers object without gcode_queue
 			if self.get_printer_status(now) == "P":
 				func_ = mid_print_allow.get(params['#command'])
 				if func_ is not None:
 					func_(params)
-					return
+					self.gcode_queue.pop( self.gcode_queue.index(com_) )
+					continue
 				else:
 					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
 					logging.info( json.dumps(params) )
-					return
+					self.gcode_queue.pop( self.gcode_queue.index(com_) )
+					continue
 
 			#	handle rrfs specials
 			if params['#command'] in rrf_commands.keys():
 				func_ = rrf_commands.get(params['#command'])
 				command = func_(params)
 				if command == 0:
-					return
+					self.gcode_queue.pop( self.gcode_queue.index(com_) )
+					continue
 
-			try:
-				logging.info( "DWC2 - sending gcode: " + json.dumps( command ) )
-				self.gcode.run_script( command, need_ack=True )		#	if i am matured, i will decide if ack is needed depending on command type
-			except Exception as e:
-				logging.exception( "DWC2 - gcode execution eror" + str(e) )
+			commands.append(command)
+
+		try:
+			logging.info( "DWC2 - sending gcode: " + json.dumps( command ) )
+			self.gcode.process_commands( commands )
+		except Exception as e:
+			logging.exception( "DWC2 - gcode execution eror" + str(e) )
 
 		#import pdb; pdb.set_trace()
 
