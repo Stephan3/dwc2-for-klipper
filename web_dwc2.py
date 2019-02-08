@@ -1178,7 +1178,7 @@ class web_dwc2:
 
 			#	filter crap and implement em step by step. 
 			supported_gcode = [ "G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M140", "M220", "M221", \
-					"M290", "M999", "STATUS", "RESTART", "FIRMWARE_RESTART" ]
+					"M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
 
 			#	midprint ecxecutions directly to klippy
 			mid_print_allow = {
