@@ -607,7 +607,9 @@ class web_dwc2:
 					meta['first_h'] = float(meta['first_h'])
 
 
-			return meta
+				return meta
+
+			return {}
 		###
 
 		#import pdb; pdb.set_trace()
@@ -636,14 +638,14 @@ class web_dwc2:
 			"err": int(0) ,
 			"size": int(os.stat(path_).st_size) ,
 			"lastModified": str(datetime.datetime.utcfromtimestamp( os.stat(path_).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")) ,
-			"height": float(meta_['objects_h']) ,
-			"firstLayerHeight": meta_['first_h'] ,
-			"layerHeight": float(meta_['layer_h']) ,
-			"printTime": int(meta_['time_e']) ,			# in seconds
-			"filament": [ float(meta_['filament']) ] ,		# in mm
-			"generatedBy": str(meta_['slicer']) ,
-			"fileName": web_.get_argument('name', default=path_.split("/")[-1] ) ,
-			"layercount": ( float(meta_['objects_h']) - meta_['first_h'] ) / float(meta_['layer_h']) + 1
+			"height": float( meta_.get("objects_h",1 ) ) ,
+			"firstLayerHeight": meta_.get("first_h",1 ) ,
+			"layerHeight": float( meta_.get("layer_h",1) ) ,
+			"printTime": int( meta_.get("time_e",1) ) ,			# in seconds
+			"filament": [ float( meta_.get("filament",1) ) ] ,		# in mm
+			"generatedBy": str( meta_.get("slicer","<<Slicer not implemented>>") ) ,
+			"fileName": web_.get_argument("name",path_.split("/")[-1] ) ,
+			"layercount": ( float(meta_.get("objects_h",1)) - meta_.get("first_h",1) ) / float(meta_.get("layer_h",1) ) + 1
 		}
 
 		self.cached_file_info = repl_
