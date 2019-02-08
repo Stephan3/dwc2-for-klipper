@@ -136,7 +136,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		dbg.start()
+		#dbg.start()
 
 	# the main webpage to serve the client browser itself        
 	class dwc_handler(tornado.web.RequestHandler):
@@ -548,15 +548,19 @@ class web_dwc2:
 			with open(path_, 'rb') as f:
 				cont_ = f.readlines()			#	gimme the whole file
 			
-			int_ = cont_[:2000] + cont_[-2000:] # 	build up header and footer
+			int_ = cont_[:2000] + cont_[-2000:] 	# 	build up header and footer
+			pile = " ".join(int_)					#	build a big pile for regex
 
 			#	determine slicer
 			hit_sl = -1
 			for s_ in slicers:
 				#	resource gunner ?
-				if s_ in int_:
+				if re.compile(s_).search(pile):
 					meta['slicer'] = s_
 					hit_sl = slicers.index(s_)
+					break
+
+			#import pdb; pdb.set_trace()
 
 			#	only grab metadata if we found a slicer
 			if hit_sl > -1 :
@@ -609,6 +613,7 @@ class web_dwc2:
 
 				return meta
 
+			self.gcode_reply.append("Your Slicer is not yet implemented.")
 			return {}
 		###
 
@@ -1250,7 +1255,6 @@ class web_dwc2:
 		params['#command'] = cmd = parts[0] + parts[1].strip()
 
 		return params
-
 
 	#	
 	#	datafetching for dicts mostly taken from Fheilman
