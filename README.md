@@ -1,7 +1,13 @@
-# dwc2-for-klipper
+# CAUTION
+Its an early stage, horrible thinkgs can happen to you and your printer.
+For first trys its a good idea to limit printer speed in config to a low value like 25mm/s or 50mm/s.
+If a ${disastercondition of doom} is occouring you can hit the emergency button. The emergency button shuts
+down immediately no gcode queue or similar in between.
+
+## dwc2-for-klipper
 A translator between DWC2 and Klipper
 
-# Installation
+## Installation
 
 For testing its sitting on root user, this will change once this here will be public.
 
@@ -27,7 +33,7 @@ listen_port: 4750
 web_path: dwc2/web
 ```
 
-# Fix missing stuff in klipper today
+## Fix missing stuff in klipper today
 A Gcode feedback is missing in klippy to work. You need to use my klipper fork or patch the few lines by hand.
 See https://github.com/KevinOConnor/klipper/pull/1203
 
