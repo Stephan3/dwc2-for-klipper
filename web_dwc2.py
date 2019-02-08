@@ -220,11 +220,11 @@ class web_dwc2:
 			#	gcode reply
 			elif "rr_reply" in self.request.uri:
 				if len( self.web_dwc2.gcode_reply ) > 0 :
-					repl_ = self.web_dwc2.gcode_reply.pop(0)
-					logging.debug( "handover gcode_reply to webif: " + str(repl_) )
-					self.write( repl_ )
+					for repl_ in self.web_dwc2.gcode_reply:
+						self.write( repl_ + "\n" )
+						logging.debug( "handover gcode_reply to webif: " + repl_ )
+					self.web_dwc2.gcode_reply = []
 				return
-					# status requests for machine data
 
 			#	status replys
 			elif "rr_status" in self.request.uri:
@@ -660,10 +660,9 @@ class web_dwc2:
 	#	dwc rr_gcode - append to gcode_queue
 	def rr_gcode(self, g_):
 		#	took from Fheilman paneldue
-		if not self.gcode_queue:
-			self.gcode_queue.append(g_)
-			self.reactor.register_callback(self.send_gcode)
-			return {"err": 0}
+		self.gcode_queue.append(g_)
+		self.reactor.register_callback(self.send_gcode)
+		return {"err": 0}
 
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
@@ -1197,7 +1196,6 @@ class web_dwc2:
 			#	handle unsupported commands
 			if params['#command'].upper() not in supported_gcode:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
-				self.gcode_queue.pop( self.gcode_queue.index(com_) )
 				continue
 
 			#	if we are midprint, do it directly to klippers object without gcode_queue
@@ -1205,12 +1203,10 @@ class web_dwc2:
 				func_ = mid_print_allow.get(params['#command'])
 				if func_ is not None:
 					func_(params)
-					self.gcode_queue.pop( self.gcode_queue.index(com_) )
 					continue
 				else:
 					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
 					logging.info( json.dumps(params) )
-					self.gcode_queue.pop( self.gcode_queue.index(com_) )
 					continue
 
 			#	handle rrfs specials
@@ -1218,13 +1214,13 @@ class web_dwc2:
 				func_ = rrf_commands.get(params['#command'])
 				command = func_(params)
 				if command == 0:
-					self.gcode_queue.pop( self.gcode_queue.index(com_) )
 					continue
 
 			commands.append(command)
 
 		try:
-			logging.info( "DWC2 - sending gcode: " + json.dumps( command ) )
+			logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
+			self.gcode_queue = []
 			self.gcode.process_commands( commands )
 		except Exception as e:
 			logging.exception( "DWC2 - gcode execution eror" + str(e) )
