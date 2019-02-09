@@ -26,24 +26,20 @@ class web_dwc2:
 		self.adress = config.get( 'listen_adress', "127.0.0.1" )
 		self.port = config.getint( "listen_port", 4711 )
 		self.webpath = config.get( 'web_path', "dwc2/web" )
-
 		#	klippy objects
 		self.printer = config.get_printer()
 		self.reactor = self.printer.get_reactor()
 		self.gcode = self.printer.lookup_object('gcode')
 		self.configfile = self.printer.lookup_object('configfile')
-
 		#	gcode execution needs
 		self.gcode_queue = []	#	containing gcode user pushes from dwc2
 		self.gcode_reply = []	#	contains the klippy replys
 		self.klipper_macros = []
 		self.gcode.register_respond_callback(self.gcode_response) #	if thers a gcode reply, phone me -> see fheilmans its missing in master
-
 		#	once klipper is ready start pre_flight function - not happy with this. If klipper fails to launch -> no web if?
 		self.printer.register_event_handler("klippy:ready", self.handle_ready)
 		self.printer.register_event_handler("klippy:disconnect", self.shutdown)
 		self.start_time = time.time()
-
 		#	grab stuff from config file
 		self.klipper_config = self.printer.get_start_args()['config_file']
 		con_ = self.configfile.read_main_config()
@@ -56,17 +52,13 @@ class web_dwc2:
 		if not os.path.isfile( self.web_root + "/" + "index.html" ):
 			logging.error( "DWC2 failed to start, no webif found in " + self.web_root )
 			return
-		
 		# manage client sessions
 		self.sessions = {}
-
 		#	parse klipper macros
 		self.dwc2()
-
 		logging.basicConfig(level=logging.DEBUG)
 
 	def handle_ready(self):
-
 		#	klippy related
 		self.toolhead = self.printer.lookup_object('toolhead', None)
 		self.sdcard = self.printer.lookup_object('virtual_sdcard', None)
@@ -84,40 +76,32 @@ class web_dwc2:
 		# print data for tracking layers during print
 		self.print_data = None
 		self.cached_file_info = None
-
 		self.klipper_ready = True
 		self.get_klipper_macros()
-
 	#	reactor calls this on klippy restart
 	def shutdown(self):
 		#	kill the thread here
 		logging.info( "DWC2 shuting down - as klippy is shutdown" )
 		self.http_server.stop()
 		self.sessions = {}
-
 	#	launch webserver
 	def dwc2(self):
-
 		def tornado_logger(req):
 			fressehaltn = []
 			fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply" ]
 			values = [req.request.remote_ip, req.request.method, req.request.uri]
 			if req.request.uri not in fressehaltn:
 				logging.info("DWC2 tornado: ".join(values))	#	bind this to debug later
-
 		def launch_tornado(application):
-
 			#time.sleep(10)	#	delay startup so dwc2 can timeout
 			logging.info( "DWC2 starting at: http://" + str(self.adress) + ":" + str(self.port) )
 			self.http_server = tornado.httpserver.HTTPServer( application )
 			self.http_server.listen( self.port )
 			tornado.ioloop.IOLoop.instance().start()
-		
 		def debug_console(self):
 			logging.debug( "Start debbug console:\n")
 			import pdb; pdb.set_trace()
 		#
-
 		cookie_secret = base64.b64encode(uuid.uuid4().bytes + uuid.uuid4().bytes) # random cookie
 		# define the threading aplication
 		application = tornado.web.Application(
@@ -130,30 +114,23 @@ class web_dwc2:
 			],
 			cookie_secret=cookie_secret,
 			log_function=tornado_logger)
-
 		self.tornado = threading.Thread( target=launch_tornado, args=(application,) )
 		self.tornado.daemon = True
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
 		#dbg.start()
-
-	# the main webpage to serve the client browser itself        
+	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
-
 		def initialize(self, p_):
 			self.web_root = p_
-
 		def get(self):
-
 			def index():
 				rq_path = self.web_root + "/index.html"
 				logging.info(" DWC2 - serving path: " + rq_path + "\n")
 				self.render( rq_path )
-
 			if self.request.uri == "/":
 				index()
-
 			elif self.request.uri == "/favicon.ico":
 				rq_path = self.web_root + "/favicon.ico"
 				with open(rq_path, "rb") as f:
@@ -284,7 +261,6 @@ class web_dwc2:
 		self.sessions[user_ip] = user_cookie
 
 		return repl_
-	
 	#	dwc rr_config
 	def rr_config(self):
 
@@ -298,8 +274,6 @@ class web_dwc2:
 			max_vel = []
 			rails_ = []
 			extru_ = []
-		
-
 		ax_ = [[],[]]
 		for r_ in rails_:
 
@@ -379,8 +353,6 @@ class web_dwc2:
 			"files": [],
 			"next":0
 		}
-
-
 		if not "/gcodes" in path_:
 
 			#	if rrf is requesting directory, it has to be there.
@@ -415,12 +387,8 @@ class web_dwc2:
 						"size": os.stat(el_path).st_size ,
 						"date": datetime.datetime.utcfromtimestamp( os.stat(el_path).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")
 					})
-
-
-
 		#	add klipper macros as virtual files
 		if "/macros" in web_.get_argument('dir').replace("0:", ""):
-			
 			for macro_ in self.klipper_macros:
 
 				repl_['files'].append({
@@ -448,7 +416,6 @@ class web_dwc2:
 		def read_gcode(path_):
 
 			#	looks complicated but should be good maintainable
-			
 			#	the heigth of all objects - regex
 			objects_h = [
 				"^G1 X.*Z.*" ,						# 	kisslicer
@@ -539,7 +506,6 @@ class web_dwc2:
 
 				#{'printTime': 4620.0, 'firstLayerHeight': '100%', 'err': 0, 'generatedBy': 'Slic3r  Prusa Edition 1.42.0-alpha3+ on 2019-02-01 at 21:06:48',
 				# 'lastModified': '2019-02-02T10:58:54', 'height': 16.4, 'layerHeight': 0.2, 'filament': [[-1]], 'size': 6324334}
-				
 				in_['first_h'] = float( in_['first_h'].replace("%", "") ) /100 * in_['layer_h']
 
 				return in_
@@ -547,7 +513,6 @@ class web_dwc2:
 			#	get 4k lines from file
 			with open(path_, 'rb') as f:
 				cont_ = f.readlines()			#	gimme the whole file
-			
 			int_ = cont_[:2000] + cont_[-2000:] 	# 	build up header and footer
 			pile = " ".join(int_)					#	build a big pile for regex
 
@@ -609,8 +574,6 @@ class web_dwc2:
 					meta = calc_first_layer(meta)
 				else:
 					meta['first_h'] = float(meta['first_h'])
-
-
 				return meta
 
 			self.gcode_reply.append("Your Slicer is not yet implemented.")
@@ -681,7 +644,6 @@ class web_dwc2:
 			return {"err": 1}
 
 		return {"err": 0}
-	
 	# 	rr_status_0 if klipper is down/failed to start
 	def rr_status_0(self):
 
@@ -723,7 +685,6 @@ class web_dwc2:
 
 	#	dwc rr_status 1
 	def rr_status_1(self):
-		
 		now = self.reactor.monotonic()
 
 		extr_stat = self.get_extr_stats(now)
@@ -763,6 +724,10 @@ class web_dwc2:
 					"state": bed_stats['state'] ,
 					"heater": 0
 				},
+				"chamber": {
+                    "active"  : 25,
+                    "heater"  : 3,
+                },
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
 				"tools": {
@@ -783,7 +748,6 @@ class web_dwc2:
 
 	#	dwc rr_status 2
 	def rr_status_2(self):
-		
 		now = self.reactor.monotonic()
 
 		extr_stat = self.get_extr_stats(now)
@@ -888,7 +852,6 @@ class web_dwc2:
 
 	#	dwc rr_status 3
 	def rr_status_3(self):
-		
 		#	nested here as its related to fileinfo_3 only
 		def manage_print_data():
 
@@ -923,8 +886,7 @@ class web_dwc2:
 				self.print_data['zhop'] = True
 			elif self.z_mean > gcode_stats['last_zpos']:
 				# curr zpos is now lower as history mean so it was a travel zhop
-				self.print_data['zhop'] = False		
-
+				self.print_data['zhop'] = False
 			if self.z_mean == gcode_stats['last_zpos'] \
 					and self.print_data['zhop']:
 				# now we know layer switched
@@ -1055,14 +1017,12 @@ class web_dwc2:
 #
 #
 #
-	
 	#	rrf G10 command - set heaterstemp
 	def cmd_G10(self, params):
 
 		tool = params['P']
 		temp = max(self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.))	#	not fully get this - John
 		command_ = "M104 T%d S%0.2f" % (int(tool)-1,float(temp))
-		
 		return command_
 
 	#	rrf M0 - cancel print from sd
@@ -1075,7 +1035,6 @@ class web_dwc2:
 
 		#	let user define a cancelprint macro`?
 		return 0
-	
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
@@ -1241,9 +1200,7 @@ class web_dwc2:
 
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line):
-					
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
-		
 		line = origline = line.strip()
 		cpos = line.find(';')
 		if cpos >= 0:
@@ -1343,8 +1300,6 @@ class web_dwc2:
 				}
 
 				extr_stats.append( app_ )
-
-
 		return extr_stats
 
 	def get_bed_stats(self, now):
@@ -1360,7 +1315,6 @@ class web_dwc2:
 				"target": status['target'] ,
 				"state": 0 if status['target'] < 20 else 2
 			}
-		
 		else:
 
 			ret_ = {
@@ -1368,8 +1322,6 @@ class web_dwc2:
 				"target": 0 ,
 				"state": 0
 			}
-
-
 		return ret_
 
 def load_config(config):
