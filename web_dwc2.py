@@ -622,10 +622,111 @@ class web_dwc2:
 
 	#	dwc rr_gcode - append to gcode_queue
 	def rr_gcode(self, g_):
-		#	took from Fheilman paneldue
-		self.gcode_queue.append(g_)
-		self.reactor.register_callback(self.send_gcode)
-		return {"err": 0}
+
+		for com_ in g_.split("\n"):
+			self.gcode_queue.append(com_)
+
+		#	special case klipper not ready/shutdown / mcu failure whatever
+		if not self.klipper_ready:
+
+			basic_allow = [ "M112", "STATUS", "RESTART", "FIRMWARE_RESTART" ]
+			for com_ in self.gcode_queue:
+
+				command = str(com_.replace(" \"0:","").replace("M999", "RESTART"))
+				self.gcode_queue.pop( self.gcode_queue.index(com_) )
+
+				if command in basic_allow:
+					self.gcode.process_commands( [command] )
+				else:
+					self.gcode_reply.append("!! Command >> %s << can not run as klipper is not ready !!" % command )
+					#import pdb; pdb.set_trace()
+
+			self.gcode_queue = []
+			return #{"err": 0}
+
+		#	if klipper is in ready state
+		now = self.reactor.monotonic()
+		commands = []
+
+		for com_ in self.gcode_queue :
+
+			# cover emergencys just do it now!!
+			if len([ True for s in self.gcode_queue if "M112".lower() in s.lower() ]) > 0:
+				self.cmd_M112("1")
+
+			command = com_.replace(" \"0:","")
+			params = self.parse_params(command)
+			params['#command'] = params['#command'].split(" ")[0]
+
+			rrf_commands = {
+				"G10": self.cmd_G10 ,		#	set heaters temp
+				"M0": self.cmd_M0 ,			#	cancel SD print
+				"M32": self.cmd_M32 ,		#	Start sdprint
+				"M98": self.cmd_M98 ,		#	run macro
+				"M106": self.cmd_M106 ,		#	set fan
+				"M290": self.cmd_M290 ,		#	set babysteps
+				"M999": self.cmd_M999		#	issue restart
+			}
+
+			#	filter crap and implement em step by step. 
+			supported_gcode = [ 
+				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M220",
+				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
+
+			#	midprint ecxecutions directly to klippy
+			mid_print_allow = {
+				"M0": self.cmd_M0 ,				#	cancel SD print
+				"M24": self.sdcard.cmd_M24 ,					#	start or resume sdprint
+				"M25": self.sdcard.cmd_M25 ,					#	Pause SDprint
+				"M106": self.gcode.cmd_M106 ,					#	set fanspeed
+				"M112": self.cmd_M112 ,							#	emergency stop
+				"M220": self.gcode.cmd_M220	,					#	set speedfactor
+				"M221": self.gcode.cmd_M221 ,					#	set extrudefactor
+				"M290": self.cmd_M290							#	set Babystep
+			}
+
+			#	handle unsupported commands
+			if params['#command'].upper() not in supported_gcode and params['#command'] in self.klipper_macros:
+				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
+				import pdb; pdb.set_trace()
+				continue
+
+			#	if we are midprint, do it directly to klippers object without gcode_queue
+			if self.get_printer_status(now) == "P":
+				func_ = mid_print_allow.get(params['#command'])
+				if func_ is not None:
+					func_(params)
+					continue
+				else:
+					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
+					logging.info( json.dumps(params) )
+					continue
+
+			#	handle rrfs specials
+			if params['#command'] in rrf_commands.keys():
+				func_ = rrf_commands.get(params['#command'])
+				command = func_(params)
+				if command == 0:
+					continue
+
+			if type(command) == str:
+				appendors = [c for c in command.split("\n")]
+			elif type(command) == list:
+				appendors = command
+			else:
+				logging.error( "DWC2 - Error in commandtype " + str(type(command)) )
+				continue
+
+			for c in appendors:
+				commands.append( c )
+
+		if commands:
+			logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
+			self.gcode_queue = []
+			self.gcode.process_commands( commands )
+
+		return
+		#import pdb; pdb.set_trace()
 
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
@@ -1032,7 +1133,7 @@ class web_dwc2:
 
 		tool = params['P']
 		temp = max(self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.))	#	not fully get this - John
-		command_ = "M104 T%d S%0.2f" % (int(tool)-1,float(temp))
+		command_ = str("M104 T%d S%0.2f" % (int(tool)-1,float(temp)))
 		return command_
 
 	#	rrf M0 - cancel print from sd
@@ -1050,7 +1151,7 @@ class web_dwc2:
 
 		#	replace the shit with regx - this will fail in its current state someday
 		file = params.get('#original').split("/")[-1].split(" ")[-1].replace("\"", "")
-		command = "M23 " + file
+		command = "M23 " + str(file)
 		command += "\nM24"
 
 		self.print_data = None
@@ -1076,7 +1177,7 @@ class web_dwc2:
 				lines = f.readlines()
 
 			for com_ in [x.strip() for x in lines]:
-				self.gcode_queue.append( com_ )
+				self.gcode_queue.append( str(com_) )
 
 			return 0
 
@@ -1086,9 +1187,9 @@ class web_dwc2:
 		if float(params['S']) < .05:
 			command = str("M107")
 		else:
-			command = params['#command'] + " S" + str(int( float(params['S']) * 255 ))
+			command = str( params['#command'] + " S" + str(int( float(params['S']) * 255 )) )
 
-		return str(command)
+		return [command]
 
 	#	fo ecxecuting m112 imidiatly!
 	def cmd_M112(self, params):
@@ -1113,102 +1214,6 @@ class web_dwc2:
 	def cmd_M999(self, params):
 
 		return [ "FIRMWARE_RESTART", "RESTART" ]
-
-	#	sending gcode to klippy
-	def send_gcode(self, eventtime):
-
-		#	special cas klipper not ready/shutdown / mcu failure whatever
-		if not self.klipper_ready:
-
-			basic_allow = [ "STATUS", "RESTART", "FIRMWARE_RESTART" ]
-			while self.gcode_queue:
-				command = self.gcode_queue.pop(0).replace(" \"0:","").replace("M999", "RESTART\nFIRMWARE_RESTART")
-				if command in basic_allow:
-					self.gcode.process_commands( [command] )
-				else:
-					self.gcode_reply.append("!! Command >> %s << can not run as klipper is not ready !!" % command )
-
-		now = self.reactor.monotonic()
-		commands = []
-
-		for com_ in self.gcode_queue :
-
-			# cover emergencys just do it now!!
-			if len([ True for s in self.gcode_queue if "M112".lower() in s.lower() ]) > 0:
-				self.cmd_M112("1")
-
-			command = com_.replace(" \"0:","")
-			params = self.parse_params(command)
-			params['#command'] = params['#command'].split(" ")[0]
-
-			rrf_commands = {
-				"G10": self.cmd_G10 ,		#	set heaters temp
-				"M0": self.cmd_M0 ,			#	cancel SD print
-				"M32": self.cmd_M32 ,		#	Start sdprint
-				"M98": self.cmd_M98 ,		#	run macro
-				"M106": self.cmd_M106 ,		#	set fan
-				"M290": self.cmd_M290 ,		#	set babysteps
-				"M999": self.cmd_M999		#	issue restart
-			}
-
-			#	filter crap and implement em step by step. 
-			supported_gcode = [ 
-				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M220",
-				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
-
-			#	midprint ecxecutions directly to klippy
-			mid_print_allow = {
-				"M0": self.cmd_M0 ,				#	cancel SD print
-				"M24": self.sdcard.cmd_M24 ,					#	start or resume sdprint
-				"M25": self.sdcard.cmd_M25 ,					#	Pause SDprint
-				"M106": self.gcode.cmd_M106 ,					#	set fanspeed
-				"M112": self.cmd_M112 ,							#	emergency stop
-				"M220": self.gcode.cmd_M220	,					#	set speedfactor
-				"M221": self.gcode.cmd_M221 ,					#	set extrudefactor
-				"M290": self.cmd_M290							#	set Babystep
-			}
-
-			#	handle unsupported commands
-			if params['#command'].upper() not in supported_gcode and params['#command'] in self.klipper_macros:
-				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
-				import pdb; pdb.set_trace()
-				continue
-
-			#	if we are midprint, do it directly to klippers object without gcode_queue
-			if self.get_printer_status(now) == "P":
-				func_ = mid_print_allow.get(params['#command'])
-				if func_ is not None:
-					func_(params)
-					continue
-				else:
-					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
-					logging.info( json.dumps(params) )
-					continue
-
-			#	handle rrfs specials
-			if params['#command'] in rrf_commands.keys():
-				func_ = rrf_commands.get(params['#command'])
-				command = func_(params)
-				if command == 0:
-					continue
-
-			if type(command) == str:
-				appendors = [c for c in command.split("\n")]
-			elif type(command) == list:
-				appendors = command
-			else:
-				logging.error( "DWC2 - Error in commandtype " + type(command) )
-				continue
-
-			for c in appendors:
-				commands.append( c )
-
-		if commands:
-			logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
-			self.gcode_queue = []
-			self.gcode.process_commands( commands )
-
-		#import pdb; pdb.set_trace()
 
 	#	getting response by callback
 	def gcode_response(self, msg):
