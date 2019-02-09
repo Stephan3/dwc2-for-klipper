@@ -1124,7 +1124,7 @@ class web_dwc2:
 			while self.gcode_queue:
 				command = self.gcode_queue.pop(0).replace(" \"0:","").replace("M999", "RESTART\nFIRMWARE_RESTART")
 				if command in basic_allow:
-					self.gcode.process_commands( commands )
+					self.gcode.process_commands( [command] )
 				else:
 					self.gcode_reply.append("!! Command >> %s << can not run as klipper is not ready !!" % command )
 
