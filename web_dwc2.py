@@ -690,8 +690,11 @@ class web_dwc2:
 
 		extr_stat = self.get_extr_stats(now)
 		bed_stats = self.get_bed_stats(now)
-		fan_stats = [ self.fan.get_status(now) ] #	this can be better
 		gcode_stats = self.gcode.get_status(now)
+		if self.fan:
+			fan_stats = [ self.fan.get_status(now) ]	#	this can be better
+		else:
+			fan_stats = []
 
 		repl_ = {
 			"status": self.get_printer_status(now),
@@ -753,8 +756,11 @@ class web_dwc2:
 
 		extr_stat = self.get_extr_stats(now)
 		bed_stats = self.get_bed_stats(now)
-		fan_stats = [ self.fan.get_status(now) ]	#	this can be better
 		gcode_stats = self.gcode.get_status(now)
+		if self.fan:
+			fan_stats = [ self.fan.get_status(now) ]	#	this can be better
+		else:
+			fan_stats = []
 
 		#	dummy data
 		repl_ = {
