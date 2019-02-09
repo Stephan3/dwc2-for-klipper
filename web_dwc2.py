@@ -644,6 +644,7 @@ class web_dwc2:
 			return {"err": 1}
 
 		return {"err": 0}
+	
 	# 	rr_status_0 if klipper is down/failed to start
 	def rr_status_0(self):
 
@@ -1073,10 +1074,12 @@ class web_dwc2:
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
 
-		#import pdb; pdb.set_trace()
-		command = params['#command'] + " S" + str(int( float(params['S']) * 255 ))
+		if float(params['S']) < .05:
+			command = str("M107")
+		else:
+			command = params['#command'] + " S" + str(int( float(params['S']) * 255 ))
 
-		return command
+		return str(command)
 
 	#	fo ecxecuting m112 imidiatly!
 	def cmd_M112(self, params):
@@ -1100,7 +1103,7 @@ class web_dwc2:
 	#	rrf restart command
 	def cmd_M999(self, params):
 
-		return "FIRMWARE_RESTART\nRESTART"
+		return [ "FIRMWARE_RESTART", "RESTART" ]
 
 	#	sending gcode to klippy
 	def send_gcode(self, eventtime):
@@ -1108,7 +1111,7 @@ class web_dwc2:
 		#	special cas klipper not ready/shutdown / mcu failure whatever
 		if not self.klipper_ready:
 
-			basic_allow = [ "STATUS", "RESTART", "FIRMWARE_RESTART", "RESTART\nFIRMWARE_RESTART" ]
+			basic_allow = [ "STATUS", "RESTART", "FIRMWARE_RESTART" ]
 			while self.gcode_queue:
 				command = self.gcode_queue.pop(0).replace(" \"0:","").replace("M999", "RESTART\nFIRMWARE_RESTART")
 				if command in basic_allow:
@@ -1180,7 +1183,16 @@ class web_dwc2:
 				if command == 0:
 					continue
 
-			commands.append(command)
+			if type(command) == str:
+				appendors = [c for c in command.split("\n")]
+			elif type(command) == list:
+				appendors = command
+			else:
+				logging.error( "DWC2 - Error in commandtype " + type(command) )
+				continue
+
+			for c in appendors:
+				commands.append( c )
 
 		if commands:
 			logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
