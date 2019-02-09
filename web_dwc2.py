@@ -920,8 +920,11 @@ class web_dwc2:
 		self.extr_stat = self.get_extr_stats(now)
 		extr_stat = self.extr_stat
 		bed_stats = self.get_bed_stats(now)
-		fan_stats = [ self.fan.get_status(now) ]	#	this can be better
 		gcode_stats = self.gcode.get_status(now)
+		if self.fan:
+			fan_stats = [ self.fan.get_status(now) ]	#	this can be better
+		else:
+			fan_stats = []
 
 		manage_print_data()
 
