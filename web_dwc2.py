@@ -511,7 +511,8 @@ class web_dwc2:
 			"axisNames": "" ,
 			"tools": [] ,
 			"volumes": 1,
-			"mountedVolumes": 1
+			"mountedVolumes": 1 ,
+			"name": self.printername
 		}
 
 		return repl_
@@ -543,7 +544,7 @@ class web_dwc2:
 			"currentTool": 0,
 			"params": {
 				"atxPower": 0,
-				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
+				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
 				"speedFactor": gcode_stats['speed_factor'] * 100,
 				"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
 				"babystep": gcode_stats['homing_zpos']
@@ -564,8 +565,8 @@ class web_dwc2:
                 #    "active"  : 25,
                 #    "heater"  : 3,
                 #},
-				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
-				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
+				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
+				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
 				"tools": {
 					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
 					"standby": [ [ 0 ] for ex_ in extr_stat ]
@@ -610,8 +611,8 @@ class web_dwc2:
 			"currentTool": 0 ,
 			"params": {
 				"atxPower": 0 ,
-				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
-				"fanNames": [ "", "", "", "", "", "", "", "", "" ],
+				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
+				"fanNames": [ "" for fan_ in fan_stats ],
 				"speedFactor": gcode_stats['speed_factor'] * 100,
 				"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
 				"babystep": gcode_stats['homing_zpos']
@@ -628,9 +629,9 @@ class web_dwc2:
 					"state": bed_stats['state'] ,
 					"heater": 0
 				},
-				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
-				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
-				"names": [ "rainer", "", "", "", "", "", "", "" ],
+				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
+				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
+				"names": [ "", "", "", "", "", "", "", "" ],
 				"tools": {
 					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
 					"standby": [ [ 0 ] for ex_ in extr_stat ]
@@ -774,7 +775,7 @@ class web_dwc2:
 			"currentTool": -1 ,
 			"params": {
 				"atxPower": 0 ,
-				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
+				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
 				"fanNames": [ "", "", "", "", "", "", "", "", "" ],
 				"speedFactor": gcode_stats['speed_factor'] * 100,
 				"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
@@ -792,8 +793,8 @@ class web_dwc2:
 					"state": bed_stats['state'] ,
 					"heater": 0
 				},
-				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
-				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
+				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
+				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
 				"names": [ "", "", "", "", "", "", "", "" ],
 				"tools": {
 					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
@@ -1078,7 +1079,7 @@ class web_dwc2:
 
 			#	filter crap and implement em step by step. 
 			supported_gcode = [ 
-				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M220",
+				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M141", "M220",
 				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
 
 			#	midprint ecxecutions directly to klippy
@@ -1095,7 +1096,7 @@ class web_dwc2:
 			}
 
 			#	handle unsupported commands
-			if params['#command'].upper() not in supported_gcode and params['#command'] in self.klipper_macros:
+			if params['#command'].upper() not in supported_gcode and not params['#command'] in self.klipper_macros:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
 				self.gcode_queue.remove(com_)
 				continue
@@ -1209,9 +1210,10 @@ class web_dwc2:
 		objects_h = [
 			'\sZ\\d+.\\d*' ,					# 	kisslicer
 			'' ,								# 	Slic3r
-			'\sZ\\d+.\\d*' ,				# 	S3d
+			'\sZ\\d+.\\d*' ,					# 	S3d
 			'G1\sZ\d*\.\d*' ,					# 	Slic3r PE
-			'\sZ\\d+.\\d*'						# 	Cura
+			'\sZ\\d+.\\d*' ,					# 	Cura
+			'\sZ\d+.\d{3}'					#	ideamaker
 			]
 
 			#	heigth of the first layer
@@ -1220,24 +1222,27 @@ class web_dwc2:
 			'; first_layer_height =' ,						# 	Slic3r
 			'\sZ\\d+.\\d*' ,								#	Simplify3d
 			'G1\sZ\d*\.\d*' ,								#	Slic3r PE
-			'\sZ\\d+.\\d\s' 								#	Cura
+			'\sZ\\d+.\\d\s' ,								#	Cura
+			';LAYER:0\n;Z:\d+.\d{3}'									#	ideamaker
 			]
 
 		#	the heigth of layers
 		layer_h = [
 			'layer_thickness_mm\s=\s\d+\.\d+' ,				#	kisslicer
 			'' ,											#	Slic3r
-			';\s+layerHeight.*' ,								#	S3d
+			';\s+layerHeight.*' ,							#	S3d
 			'; layer_height = \d.\d+' ,						#	Slic3r PE
-			';Layer height: \d.\d+' 						# 	Cura
+			';Layer height: \d.\d+' ,						# 	Cura
+			';Z:\d+.\d{3}'									#	ideamaker
 			]
 		#	slicers estimate print time
 		time_e = [
-			'\s\s\d*\.\d*\sminutes' , 					#	Kisslicer
+			'\s\s\d*\.\d*\sminutes' , 						#	Kisslicer
 			'; estimated printing time' ,					#	Slic3r
-			';\s+Build time:.*' ,								#	S3d
+			';\s+Build time:.*' ,							#	S3d
 			'\d+h?\s?\d+m\s\d+s' ,							#	Slic3r PE
-			';TIME:\\d+'									#	Cura
+			';TIME:\\d+' ,									#	Cura
+			';Print Time:\s\d+\.?\d+'						#	ideamaker
 			]
 		#	slicers filament usage
 		filament = [
@@ -1245,14 +1250,17 @@ class web_dwc2:
 			';.*filament used =' ,							#	Slic3r
 			';.*Filament length: \d+.*\(' ,					#	S3d
 			'.*filament\sused\s=\s.*mm' ,					#	Slic3r PE ; filament used =
-			';Filament used: \d*.\d+m'						#	Cura
+			';Filament used: \d*.\d+m'	,					#	Cura
+			';Material#1 Used:\s\d+\.?\d+'					#	ideamaker
 			]
+		#	slicernames
 		slicers = [ 
 			'KISSlicer' ,
 			'^Slic3r$' ,
-			'Simplify3D' ,
-			'Slic3r Prusa Edition.*on',
-			'Cura_SteamEngine'
+			'Simplify3D\(R\).*' ,
+			'Slic3r Prusa Edition\s.*\so',
+			'Cura_SteamEngine.*' ,
+			'ideaMaker\s([0-9]*\..*,)'
 			]
 		#
 		meta = { "slicer": "Slicer is not implemented" }
@@ -1282,11 +1290,12 @@ class web_dwc2:
 		pile = " ".join(int_)					#	build a big pile for regex
 		#	determine slicer
 		sl = -1
-		for s_ in slicers:
+		for regex in slicers:
 			#	resource gunner ?
-			if re.compile(s_).search(pile):
-				meta['slicer'] = s_
-				sl = slicers.index(s_)
+			if re.compile(regex).search(pile):
+				#import pdb; pdb.set_trace()
+				meta['slicer'] = re.search(re.compile(regex),pile).group()
+				sl = slicers.index(regex)
 				break
 		#	only grab metadata if we found a slicer
 		if sl > -1 :
