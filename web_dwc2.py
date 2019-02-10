@@ -119,7 +119,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		dbg.start()
+		#dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
 		def initialize(self, p_):
@@ -968,6 +968,13 @@ class web_dwc2:
 
 		#	we will parse it later here
 		logging.debug( "DWC2 DEBUG - incomming gcode_reply: " + str( msg ) )
+		
+		if self.klipper_ready:
+			stat_ = self.get_printer_status(0)
+			if stat_ in [ "S", "P", "D" ]:
+				#SPD? printing state
+				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
+
 		self.gcode_reply.append(msg)
 
 		#import pdb; pdb.set_trace()
@@ -1019,7 +1026,7 @@ class web_dwc2:
 		if self.sdcard.current_file is not None:
 			if self.sdcard.must_pause_work:
 				# D = pausing, A = paused
-				return "D" if self.sdcard.work_timer is not None else "S"	#	A is not pause
+				return "D" if self.sdcard.work_timer is not None else "S"	#	A was not pause
 			if self.sdcard.current_file is not None and self.sdcard.work_timer is not None:
 				# Printing
 				return "P"
@@ -1258,20 +1265,21 @@ class web_dwc2:
 
 		def calc_time(in_):
 			if in_ == -1: return in_
+			#import pdb; pdb.set_trace()
 			h_str = re.search(re.compile('(\d+(\s)?hours|\d+(\s)?h)'),in_)
-			m_str = re.search(re.compile('(\d+(\s)?minutes|\d+(\s)?m)'),in_)
+			m_str = re.search(re.compile('(([0-9]*\.[0-9]+)\sminutes|\d+(\s)?m)'),in_)
 			s_str = re.search(re.compile('(\d+(\s)?seconds|\d+(\s)?s)'),in_)
 			dursecs = 0
 			if h_str:
-				dursecs += int( max( re.findall('\d+' , ''.join(h_str.group()) ) ) ) *3600 
+				dursecs += float( max( re.findall('([0-9]*\.?[0-9]+)' , ''.join(h_str.group()) ) ) ) *3600 
 			if m_str:
-				dursecs += int( max( re.findall('\d+' , ''.join(m_str.group()) ) ) ) *60 
+				dursecs += float( max( re.findall('([0-9]*\.?[0-9]+)' , ''.join(m_str.group()) ) ) ) *60 
 			if s_str:
-				dursecs += int( max( re.findall('\d+' , ''.join(s_str.group()) ) ) )
+				dursecs += float( max( re.findall('([0-9]*\.?[0-9]+)' , ''.join(s_str.group()) ) ) )
 			if dursecs == 0:
-				dursecs = int( max( re.findall('\d+' , in_) ) )
+				dursecs = float( max( re.findall('([0-9]*\.?[0-9]+)' , in_) ) )
+
 			return dursecs
-			return in_
 
 		#	get 4k lines from file
 		with open(path_, 'rb') as f:
@@ -1290,26 +1298,38 @@ class web_dwc2:
 		if sl > -1 :
 			#import pdb; pdb.set_trace()
 			if objects_h[sl] != "":
-				matches = re.findall(objects_h[sl], pile )
-				meta['objects_h'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?					
+				try:
+					matches = re.findall(objects_h[sl], pile )
+					meta['objects_h'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?	
+				except:
+					pass				
 			if layer_h[sl] != "":
-				matches = re.findall(layer_h[sl], pile )
-				meta['layer_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+				try:
+					matches = re.findall(layer_h[sl], pile )
+					meta['layer_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+				except:
+					pass
 			if first_h[sl] != "":
-				matches = re.findall(first_h[sl], pile )
-				meta['first_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+				try:
+					matches = re.findall(first_h[sl], pile )
+					meta['first_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+				except:
+					pass
 			if time_e[sl] != "":
-				matches = re.findall(time_e[sl], pile )
-				meta['time_e'] = max( matches )
+				try:
+					matches = re.findall(time_e[sl], pile )
+					meta['time_e'] = max( matches )
+					meta['time_e'] = calc_time(meta['time_e'])	#	bring time to seconds
+				except:
+					pass
 			if filament[sl] != "":
-				matches = re.findall(filament[sl], pile )
-				meta['filament'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
-				meta['filament'] = (meta['filament'],meta['filament']*1000)[sl==4]	#	cura is in m -> translate
-			#
-			#
-			#
-			#	data refining:
-			meta['time_e'] = calc_time(meta['time_e'])	#	bring time to seconds
+				try:
+					matches = re.findall(filament[sl], pile )
+					meta['filament'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
+					meta['filament'] = (meta['filament'],meta['filament']*1000)[sl==4]	#	cura is in m -> translate
+				except:
+					pass
+			
 		else:
 			self.gcode_reply.append("Your Slicer is not yet implemented.")
 			
