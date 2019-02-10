@@ -1255,14 +1255,7 @@ class web_dwc2:
 			'Cura_SteamEngine'
 			]
 		#
-		meta = {
-			"objects_h": -1 ,
-			"first_h": -1 ,
-			"layer_h": -1 ,
-			"time_e": -1 ,
-			"filament": [ -1 ] ,
-			"slicer": "Slicer is not implemented"
-		}
+		meta = { "slicer": "Slicer is not implemented" }
 
 		def calc_time(in_):
 			if in_ == -1: return in_
@@ -1333,7 +1326,7 @@ class web_dwc2:
 			
 		else:
 			self.gcode_reply.append("Your Slicer is not yet implemented.")
-			
+
 		#	put it in rrf format
 		repl_ = {
 			"err": int(0) ,
