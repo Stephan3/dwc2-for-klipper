@@ -5,43 +5,80 @@ A translator between DWC2 and Klipper
 Its an early stage, horrible thinkgs can happen to you, your printer, your moms cellar or your cat.
 For first trys its a good idea to limit printer speed in config to a low value like 25mm/s or 50mm/s.
 If a ${disastercondition of doom} is occouring, you can hit the emergency button. The emergency button shuts
-down immediately no gcode queue or similar in between, it just overrides all.
+down immediately no gcode queue or similar in between, it just overrides everything.
+
+## What works
+
+* printing from klippers virtual sdcard
+* pause / cancel prints (resume?)
+* babystepping feature using klippers ```SET_GCODE_OFFSET Z_ADJUST```
+* editing klippers configuration. Its displayed as config.g in system section. So the webif restarts klipper after saving.
+* Klipper macros are imported as virtual files and can be accesed from the dashboard
+* uploads and downloads of gcodes
+* gcode analysis using regex to determine duration / layerhighth / firstlayer / filamentusage and other
+* the math for printtime left based on whatever, showing layerhistory, detecting layerchanges etc. (needs working slicer regex)
+* settings of webinterface are saved and loded correctly
+* homing / extruding / moving
+* heater control
+* setting fanspeed / extrusionmultipler / speedfactor during print in statuswindow
+
+## What is not working
+
+* webcam integration
+* heightmap
+* printsimuation
+* actual machinespeed, only displaying the requested values
+  * klipper does not have this feedback (yet)? due to its lookahead feature 
+  * can we calc this? movelength/junction/acceleration is there
+* ......
 
 ## Installation
 
 ### Prerequirements
 python2, tornado, gunzip, unzip, wget
+
+##### oOn arch:
 ```
-pacman -Sy && pacman -S python2 python2-tornado wget gunzip
+sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
 ```
 
-For testing its sitting on root user, this will change once this here will be public.
+Maybe you´ll need to change the startup system for klipper to access ~/klipper/klippy/klippy.py
+
+##### on Octopi / Ubuntu / Debian (untested, feedback wanted)
 ```
+sudo apt install python python-pip wget gunzip tar
+```
+
+Then switch to your klipper user and:
+```
+sudo systemctl stop klipper
+cd ~
 git clone https://github.com/Stephan3/klipper.git
-git clone https://{your_git_user_here}@github.com/Stephan3/dwc2-for-klipper.git
-ln -s /root/dwc2-for-klipper/web_dwc2.py /root/klipper/klippy/extras/web_dwc2.py
-mkdir -p /root/sdcard/dwc2/web 
-cd /root/sdcard/dwc2/web 
+git clone https://your_git_user_here@github.com/Stephan3/dwc2-for-klipper.git
+ln -s ~/dwc2-for-klipper/web_dwc2.py ~/klipper/klippy/extras/web_dwc2.py
+mkdir -p ~/sdcard/dwc2/web
+cd ~/sdcard/dwc2/web 
 wget -q  https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
-/usr/bin/python2 /root/klipper/klippy/klippy.py /root/printer.cfg
+sudo systemctl start klipper
 ```
 
 ### Klipper config example:
 ```
 [virtual_sdcard]
-path: /root/sdcard
+path: /home/pi/sdcard
 
 [web_dwc2]
+# optional - defaulting to Klipper
+printer_name: Reiner Calmund
+# optional - defaulting to 0.0.0.0
 listen_adress: 0.0.0.0
+# needed - use above 1024 as nonroot
 listen_port: 4750
-#	folder on sdcard
+#	optional defaulting to dwc2/web. Its a folder relative to your virtual sdcard.
 web_path: dwc2/web
 ```
 
 ## Fix missing stuff in klipper today
-A Gcode callback and ack system is missing in klippy today for other objects than the serial. You need to use my klipper fork or patch the few lines by hand.
-See https://github.com/KevinOConnor/klipper/pull/1203
-
-Könnte mir btw mal einer erklären, warum ich das in englisch schreibe ? :D
-Das lesen doch eh nur Deutschsprachige.
+A Gcode callback and ack system is missing in klippy today for other objects than the serial. You need to use my klipper fork or patch the few lines by hand in gcode.py.
+See https://github.com/KevinOConnor/klipper/pull/1217
