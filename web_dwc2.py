@@ -884,6 +884,8 @@ class web_dwc2:
 		if not self.cached_file_info:
 			self.cached_file_info = self.read_gcode(self.sdpath + "/" + file)
 
+		lz_ = self.toolhead.get_position()[3]
+
 		self.print_data = {
 			"print_start": time.time() ,
 			"print_dur": 0 ,
