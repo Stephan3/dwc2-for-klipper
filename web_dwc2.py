@@ -606,7 +606,7 @@ class web_dwc2:
 				"requested": 0 ,
 				"top": gcode_stats['speed']	/ 60	#	not ecxatly the same but comes close
 			},
-			"currentTool": -1 ,
+			"currentTool": 0 ,
 			"params": {
 				"atxPower": 0 ,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
@@ -629,7 +629,7 @@ class web_dwc2:
 				},
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
-				"names": [ "", "", "", "", "", "", "", "" ],
+				"names": [ "rainer", "", "", "", "", "", "", "" ],
 				"tools": {
 					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
 					"standby": [ [ 0 ] for ex_ in extr_stat ]
@@ -661,8 +661,6 @@ class web_dwc2:
 				"height": 0,
 				"type": 8
 			},
-			#	will work for 1 extruder
-			#[ 0 ] for ex_ in extr_stat
 			"tools": [
 				{
 					"number": extr_stat.index(ex_) + 1 ,
