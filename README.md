@@ -69,7 +69,7 @@ path: /home/pi/sdcard
 
 [web_dwc2]
 # optional - defaulting to Klipper
-printer_name: Test System
+printer_name: Reiner Calmund
 # optional - defaulting to 0.0.0.0
 listen_adress: 0.0.0.0
 # needed - use above 1024 as nonroot
