@@ -74,7 +74,7 @@ class web_dwc2:
 		self.kinematics = self.toolhead.get_kinematics()
 
 		# print data for tracking layers during print
-		self.print_data = None
+		self.print_data = {}
 		self.cached_file_info = None
 		self.klipper_ready = True
 		self.get_klipper_macros()
@@ -119,7 +119,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		#dbg.start()
+		dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
 		def initialize(self, p_):
@@ -504,17 +504,18 @@ class web_dwc2:
 			#	handle unsupported commands
 			if params['#command'].upper() not in supported_gcode and params['#command'] in self.klipper_macros:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
+				self.gcode_queue.remove(com_)
 				continue
 
 			#	if we are midprint, do it directly to klippers object without gcode_queue
 			if self.get_printer_status(now) == "P":
+				self.gcode_queue.remove(com_)
 				func_ = mid_print_allow.get(params['#command'])
 				if func_ is not None:
 					func_(params)
 					continue
 				else:
 					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
-					logging.info( json.dumps(params) )
 					continue
 
 			#	handle rrfs specials
@@ -530,15 +531,21 @@ class web_dwc2:
 				appendors = command
 			else:
 				logging.error( "DWC2 - Error in commandtype " + str(type(command)) )
+				self.gcode_queue.remove(com_)
 				continue
 
 			for c in appendors:
 				commands.append( c )
 
 		if commands:
-			logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
 			self.gcode_queue = []
-			self.gcode.process_commands( commands )
+			if self.gcode.is_processing_data:
+				for com_ in commands:
+					logging.info( "DWC2 - appending gcode to klippy queue: " + com_ )
+					self.gcode.pending_commands.append(com_)
+			else:
+				logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
+				self.gcode.process_commands( commands )
 
 		return
 		#import pdb; pdb.set_trace()
@@ -786,7 +793,7 @@ class web_dwc2:
 				self.print_data = {
 					"print_start": time.time() ,
 					"print_dur": 0 ,
-					"extr_start": [ ex_['pos'] for ex_ in extr_stat ] ,
+					"extr_start": sum(self.toolhead.get_position()[3:]) ,
 					"firstlayer_dur": 0 ,
 					"curr_layer": 1 ,
 					"curr_layer_start": 0 ,
@@ -799,7 +806,7 @@ class web_dwc2:
 			self.z_mean = round( sum(self.print_data['last_zposes']) / len(self.print_data['last_zposes']) , 2 )
 
 			if self.print_data['curr_layer_start'] == 0 \
-					and sum(self.print_data['extr_start']) < sum([ ex_['pos'] for ex_ in extr_stat ]):
+					and self.print_data['extr_start'] < sum(self.toolhead.get_position()[3:]):
 				#	now we know firstlayer started + heating ended(homing?)
 				self.print_data['curr_layer_start'] = time.time()
 				self.print_data['heat_time'] = time.time() - self.print_data['print_start']
@@ -844,74 +851,74 @@ class web_dwc2:
 
 		manage_print_data()
 
-		try:
-			repl_ = {
-				"status": self.get_printer_status(now) ,
-				"coords": {
-					"axesHomed": self.get_axes_homed() ,
-					"xyz": self.toolhead.get_position()[:3] ,
-					"machine": [ 0, 0, 0 ] ,
-					"extr": self.toolhead.get_position()[3:]
+		#try:
+		repl_ = {
+			"status": self.get_printer_status(now) ,
+			"coords": {
+				"axesHomed": self.get_axes_homed() ,
+				"xyz": self.toolhead.get_position()[:3] ,
+				"machine": [ 0, 0, 0 ] ,
+				"extr": self.toolhead.get_position()[3:]
+			},
+			"speeds": {
+				"requested": 0 ,
+				"top": gcode_stats['speed'] /60	#	not ecxatly the same but comes close
+			},
+			"currentTool": -1 ,
+			"params": {
+				"atxPower": 0 ,
+				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
+				"fanNames": [ "", "", "", "", "", "", "", "", "" ],
+				"speedFactor": gcode_stats['speed_factor'] * 100,
+				"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
+				"babystep": gcode_stats['homing_zpos']
+			},
+			"seq": len(self.gcode_reply),
+			"sensors": {
+				"probeValue": 0,
+				"fanRPM": 0
+			},
+			"temps": {
+				"bed": {
+					"current": bed_stats['actual'] ,
+					"active": bed_stats['target'] ,
+					"state": bed_stats['state'] ,
+					"heater": 0
 				},
-				"speeds": {
-					"requested": 0 ,
-					"top": gcode_stats['speed'] /60	#	not ecxatly the same but comes close
+				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
+				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
+				"names": [ "", "", "", "", "", "", "", "" ],
+				"tools": {
+					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
+					"standby": [ [ 0 ] for ex_ in extr_stat ]
 				},
-				"currentTool": -1 ,
-				"params": {
-					"atxPower": 0 ,
-					"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] + [ 0 for missing_ in range( 0, 9 - len(fan_stats) ) ] ,
-					"fanNames": [ "", "", "", "", "", "", "", "", "" ],
-					"speedFactor": gcode_stats['speed_factor'] * 100,
-					"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
-					"babystep": gcode_stats['homing_zpos']
-				},
-				"seq": len(self.gcode_reply),
-				"sensors": {
-					"probeValue": 0,
-					"fanRPM": 0
-				},
-				"temps": {
-					"bed": {
-						"current": bed_stats['actual'] ,
-						"active": bed_stats['target'] ,
-						"state": bed_stats['state'] ,
-						"heater": 0
-					},
-					"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
-					"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
-					"names": [ "", "", "", "", "", "", "", "" ],
-					"tools": {
-						"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
-						"standby": [ [ 0 ] for ex_ in extr_stat ]
-					},
-					"extra": [
-						{
-							"name": "*MCU",
-							"temp": 0
-						}
-					]
-				},
-				"time": self.start_time - time.time(),
-				"currentLayer": self.print_data['curr_layer'] ,
-				"currentLayerTime": self.print_data['curr_layer_dur'],
-				"extrRaw": self.toolhead.get_position()[3:] ,
-				"fractionPrinted": self.sdcard.get_status(now) , # percent done
-				"filePosition": self.sdcard.file_position,
-				"firstLayerDuration": self.print_data['firstlayer_dur'] if self.print_data['firstlayer_dur'] > 0 else self.print_data['curr_layer_dur'],
-				"firstLayerHeight": self.cached_file_info['firstLayerHeight'],
-				"printDuration": self.print_data['print_dur'] ,
-				"warmUpDuration": self.print_data['heat_time'],
-				"timesLeft": {
-					"file": (1-self.sdcard.get_status(now)['progress']) * self.cached_file_info['printTime'],
-					"filament": (1-( sum(self.toolhead.get_position()[3:]) - sum(self.print_data["extr_start"])  ) \
-									/ sum(self.cached_file_info["filament"]) ) * self.cached_file_info['printTime'],
-					"layer": (1-self.print_data['curr_layer'] / self.cached_file_info['layercount']) * self.cached_file_info['printTime']
-				}
+				"extra": [
+					{
+						"name": "*MCU",
+						"temp": 0
+					}
+				]
+			},
+			"time": time.time() - self.start_time,
+			"currentLayer": self.print_data['curr_layer'] ,
+			"currentLayerTime": self.print_data['curr_layer_dur'],
+			"extrRaw": sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start'] ,
+			"fractionPrinted": self.sdcard.get_status(now).get('progress', 0) , # percent done
+			"filePosition": self.sdcard.file_position,
+			"firstLayerDuration": self.print_data['firstlayer_dur'] if self.print_data['firstlayer_dur'] > 0 else self.print_data['curr_layer_dur'],
+			"firstLayerHeight": self.cached_file_info['firstLayerHeight'],
+			"printDuration": self.print_data['print_dur'] ,
+			"warmUpDuration": self.print_data['heat_time'],
+			"timesLeft": {
+				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.cached_file_info['printTime'],
+				"filament": (1-( sum(self.toolhead.get_position()[3:]) - self.print_data["extr_start"] ) \
+								/ sum(self.cached_file_info["filament"]) ) * self.cached_file_info['printTime'],
+				"layer": (1-self.print_data['curr_layer'] / self.cached_file_info['layercount']) * self.cached_file_info['printTime']
 			}
+		}
 
-		except Exception as e:
-			import pdb; pdb.set_trace()
+		#except Exception as e:
+		#	import pdb; pdb.set_trace()
 
 		return repl_
 
@@ -957,7 +964,8 @@ class web_dwc2:
 		self.sdcard.must_pause_work = True 		#	pause print -> sdcard postion is saved in virtual sdcard
 		self.sdcard.file_position = 0			#	reset fileposition
 		self.sdcard.work_timer = None 			#	reset worktimer
-		self.sdcard.must_pause_work = False 	#	this is for our ugy getstatus
+		self.sdcard.current_file = None 		#	
+		#self.sdcard.must_pause_work = False 	#	this is for our ugy getstatus
 
 		#	let user define a cancelprint macro`?
 		return 0
@@ -973,7 +981,7 @@ class web_dwc2:
 		if not self.cached_file_info:
 			self.cached_file_info = self.read_gcode(self.sdpath + "/" + file)
 
-		self.print_data = None
+		self.print_data = {}
 
 		return command
 
@@ -1010,7 +1018,7 @@ class web_dwc2:
 
 		return [command]
 
-	#	fo ecxecuting m112 imidiatly!
+	#	fo ecxecuting m112 now!
 	def cmd_M112(self, params):
 		self.cmd_M0(params)
 		self.printer.invoke_shutdown("Emergency Stop from DWC 2")
@@ -1087,7 +1095,7 @@ class web_dwc2:
 			self.klipper_ready = False
 			return "O"
 
-		if self.sdcard is not None:
+		if self.sdcard.current_file is not None:
 			if self.sdcard.must_pause_work:
 				# D = pausing, A = paused
 				return "D" if self.sdcard.work_timer is not None else "S"	#	A is not pause
@@ -1095,7 +1103,8 @@ class web_dwc2:
 				# Printing
 				return "P"
 
-		if self.gcode.get_status(now)['busy']:
+		#if self.gcode.get_status(now)['busy']:
+		if self.gcode.is_processing_data:
 			# B = busy
 			return "B"
 
