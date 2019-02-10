@@ -64,6 +64,7 @@ class web_dwc2:
 		self.toolhead = self.printer.lookup_object('toolhead', None)
 		self.sdcard = self.printer.lookup_object('virtual_sdcard', None)
 		self.fan = self.printer.lookup_object('fan', None)
+		self.chamber = self.printer.lookup_object('chamber', None)
 		#	hopeflly noone get more than 4 extruders up :D
 		self.extruders = [
 			self.printer.lookup_object('extruder0', None) ,
@@ -120,7 +121,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		#dbg.start()
+		dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
 		def initialize(self, p_):
@@ -562,9 +563,11 @@ class web_dwc2:
 					"heater": 0
 				},
 				#"chamber": {
-                #    "active"  : 25,
-                #    "heater"  : 3,
-                #},
+				#	"current": 19.5,
+				#	"active": 0,
+				#	"state": 0,
+				#	"heater": 2
+				#},
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
 				"tools": {
@@ -580,6 +583,17 @@ class web_dwc2:
 			},
 			"time": self.start_time - time.time()
 		}
+
+		if self.chamber:
+			chamber_stats = self.chamber.get_status(0)
+			repl_['temps'].update({ "chamber": {
+					"current": chamber_stats.get("temp") ,
+					"active": chamber_stats.get("target", -1) ,
+					"state": chamber_stats.get("state") ,
+					"heater": 2 ,	#	extruders + bett ?
+				} })
+			repl_['temps']['current'].append( chamber_stats.get("temp") )
+			repl_['temps']['state'].append( chamber_stats.get("state") )
 
 		return repl_
 
@@ -629,6 +643,12 @@ class web_dwc2:
 					"state": bed_stats['state'] ,
 					"heater": 0
 				},
+				#"chamber": {
+				#	"current": 19.6,
+				#	"active": 0,
+				#	"state": 0,
+				#	"heater": 2
+				#},
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
 				"names": [ "", "", "", "", "", "", "", "" ],
@@ -686,6 +706,16 @@ class web_dwc2:
 			#	"max": 24.5
 			#}
 		}
+		if self.chamber:
+			chamber_stats = self.chamber.get_status(0)
+			repl_['temps'].update({ "chamber": {
+					"current": chamber_stats.get("temp") ,
+					"active": chamber_stats.get("target", -1) ,
+					"state": chamber_stats.get("state") ,
+					"heater": 2 ,	#	extruders + bett ?
+				} })
+			repl_['temps']['current'].append( chamber_stats.get("temp") )
+			repl_['temps']['state'].append( chamber_stats.get("state") )
 
 		return repl_
 
