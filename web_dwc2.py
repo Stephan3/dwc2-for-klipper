@@ -413,150 +413,6 @@ class web_dwc2:
 	#	dwc fileinfo - getting gcode info
 	def rr_fileinfo(self, web_):
 
-		def read_gcode(path_):
-
-			#	looks complicated but should be good maintainable
-			#	the heigth of all objects - regex
-			objects_h = [
-				'\sZ\\d+.\\d*' ,					# 	kisslicer
-				'' ,								# 	Slic3r
-				'\sZ\\d+.\\d*' ,				# 	S3d
-				'G1\sZ\d*\.\d*' ,					# 	Slic3r PE
-				'\sZ\\d+.\\d*'						# 	Cura
-				]
-
-			#	heigth of the first layer
-			first_h = [ 
-				'first_layer_thickness_mm\s=\s\d+\.\d+' , 		#	kisslicers setting
-				'; first_layer_height =' ,						# 	Slic3r
-				'\sZ\\d+.\\d*' ,								#	Simplify3d
-				'G1\sZ\d*\.\d*' ,								#	Slic3r PE
-				'\sZ\\d+.\\d\s' 								#	Cura
-				]
-
-			#	the heigth of layers
-			layer_h = [
-				'layer_thickness_mm\s=\s\d+\.\d+' ,				#	kisslicer
-				'' ,											#	Slic3r
-				';\s+layerHeight.*' ,								#	S3d
-				'; layer_height = \d.\d+' ,						#	Slic3r PE
-				';Layer height: \d.\d+' 						# 	Cura
-				]
-
-			#	slicers estimate print time
-			time_e = [
-				'\s\s\d*\.\d*\sminutes' , 					#	Kisslicer
-				'; estimated printing time' ,					#	Slic3r
-				';\s+Build time:.*' ,								#	S3d
-				'\d+h?\s?\d+m\s\d+s' ,							#	Slic3r PE
-				';TIME:\\d+'									#	Cura
-				]
-
-			#	slicers filament usage
-			filament = [
-				'Ext 1 =.*mm' ,									#	Kisslicer
-				';.*filament used =' ,							#	Slic3r
-				';.*Filament length: \d+.*\(' ,					#	S3d
-				'.*filament\sused\s=\s.*mm' ,					#	Slic3r PE ; filament used =
-				';Filament used: \d*.\d+m'						#	Cura
-				]
-
-			slicers = [ 
-				'KISSlicer' ,
-				'^Slic3r$' ,
-				'Simplify3D' ,
-				'Slic3r Prusa Edition.*on',
-				'Cura_SteamEngine'
-				]
-
-			#
-
-			meta = {
-				"objects_h": -1 ,
-				"first_h": -1 ,
-				"layer_h": -1 ,
-				"time_e": -1 ,
-				"filament": [ -1 ] ,
-				"slicer": "Slicer is not implemented"
-			}
-
-			def calc_time(in_):
-
-				if in_ == -1: return in_
-
-				h_str = re.search(re.compile('(\d+(\s)?hours|\d+(\s)?h)'),in_)
-				m_str = re.search(re.compile('(\d+(\s)?minutes|\d+(\s)?m)'),in_)
-				s_str = re.search(re.compile('(\d+(\s)?seconds|\d+(\s)?s)'),in_)
-
-				dursecs = 0
-				if h_str:
-					dursecs += int( max( re.findall('\d+' , ''.join(h_str.group()) ) ) ) *3600 
-				if m_str:
-					dursecs += int( max( re.findall('\d+' , ''.join(m_str.group()) ) ) ) *60 
-				if s_str:
-					dursecs += int( max( re.findall('\d+' , ''.join(s_str.group()) ) ) )
-
-				if dursecs == 0:
-					dursecs = int( max( re.findall('\d+' , in_) ) )
-
-				return dursecs
-
-				return in_
-
-			#	get 4k lines from file
-			with open(path_, 'rb') as f:
-				cont_ = f.readlines()			#	gimme the whole file
-			int_ = cont_[:2000] + cont_[-2000:] 	# 	build up header and footer
-			pile = " ".join(int_)					#	build a big pile for regex
-
-			#	determine slicer
-			sl = -1
-			for s_ in slicers:
-				#	resource gunner ?
-				if re.compile(s_).search(pile):
-					meta['slicer'] = s_
-					sl = slicers.index(s_)
-					break
-
-			#	only grab metadata if we found a slicer
-			if sl > -1 :
-
-				#import pdb; pdb.set_trace()
-
-				if objects_h[sl] != "":
-					matches = re.findall(objects_h[sl], pile )
-					meta['objects_h'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
-					
-				if layer_h[sl] != "":
-					matches = re.findall(layer_h[sl], pile )
-					meta['layer_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
-
-				if first_h[sl] != "":
-					matches = re.findall(first_h[sl], pile )
-					meta['first_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
-
-				if time_e[sl] != "":
-					matches = re.findall(time_e[sl], pile )
-					meta['time_e'] = max( matches )
-
-				if filament[sl] != "":
-					matches = re.findall(filament[sl], pile )
-					meta['filament'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
-					meta['filament'] = (meta['filament'],meta['filament']*1000)[sl==4]	#	cura is in m -> translate
-
-				#
-				#
-				#
-
-				#	data refining:
-				meta['time_e'] = calc_time(meta['time_e'])	#	bring time to seconds
-
-				return meta
-
-			self.gcode_reply.append("Your Slicer is not yet implemented.")
-			return {}
-		###
-
 		#import pdb; pdb.set_trace()
 
 		#	hits if we are in printing state
@@ -576,31 +432,14 @@ class web_dwc2:
 		if not os.path.isfile(path_):
 			repl_ = { "err": 1 }
 
-		meta_ = read_gcode(path_)
-
-		#	setup reply with correct datatypes
-		repl_ = {
-			"err": int(0) ,
-			"size": int(os.stat(path_).st_size) ,
-			"lastModified": str(datetime.datetime.utcfromtimestamp( os.stat(path_).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")) ,
-			"height": float( meta_.get("objects_h",1 ) ) ,
-			"firstLayerHeight": meta_.get("first_h",1 ) ,
-			"layerHeight": float( meta_.get("layer_h",1) ) ,
-			"printTime": int( meta_.get("time_e",1) ) ,			# in seconds
-			"filament": [ float( meta_.get("filament",1) ) ] ,		# in mm
-			"generatedBy": str( meta_.get("slicer","<<Slicer not implemented>>") ) ,
-			"fileName": web_.get_argument("name",path_.split("/")[-1] ) ,
-			"layercount": ( float(meta_.get("objects_h",1)) - meta_.get("first_h",1) ) / float(meta_.get("layer_h",1) ) + 1
-		}
-
-		self.cached_file_info = repl_
+		repl_ = self.read_gcode(path_)
 
 		return repl_
 
 	#	dwc rr_gcode - append to gcode_queue
 	def rr_gcode(self, g_):
 
-		for com_ in g_.split("\n"):
+		for com_ in str(g_).split("\n"):
 			self.gcode_queue.append(com_)
 
 		#	special case klipper not ready/shutdown / mcu failure whatever
@@ -665,7 +504,6 @@ class web_dwc2:
 			#	handle unsupported commands
 			if params['#command'].upper() not in supported_gcode and params['#command'] in self.klipper_macros:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
-				import pdb; pdb.set_trace()
 				continue
 
 			#	if we are midprint, do it directly to klippers object without gcode_queue
@@ -806,10 +644,10 @@ class web_dwc2:
 					"state": bed_stats['state'] ,
 					"heater": 0
 				},
-				"chamber": {
-                    "active"  : 25,
-                    "heater"  : 3,
-                },
+				#"chamber": {
+                #    "active"  : 25,
+                #    "heater"  : 3,
+                #},
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] + [ 0 for missing_ in range( 0, 7 - len(extr_stat) ) ],
 				"tools": {
@@ -1123,6 +961,7 @@ class web_dwc2:
 
 		#	let user define a cancelprint macro`?
 		return 0
+	
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
@@ -1130,6 +969,9 @@ class web_dwc2:
 		file = params.get('#original').split("/")[-1].split(" ")[-1].replace("\"", "")
 		command = "M23 " + str(file)
 		command += "\nM24"
+		
+		if not self.cached_file_info:
+			self.cached_file_info = self.read_gcode(self.sdpath + "/" + file)
 
 		self.print_data = None
 
@@ -1326,6 +1168,144 @@ class web_dwc2:
 				"state": 0
 			}
 		return ret_
+
+	def read_gcode(self, path_):
+
+		#	looks complicated but should be good maintainable
+		#	the heigth of all objects - regex
+		objects_h = [
+			'\sZ\\d+.\\d*' ,					# 	kisslicer
+			'' ,								# 	Slic3r
+			'\sZ\\d+.\\d*' ,				# 	S3d
+			'G1\sZ\d*\.\d*' ,					# 	Slic3r PE
+			'\sZ\\d+.\\d*'						# 	Cura
+			]
+
+			#	heigth of the first layer
+		first_h = [ 
+			'first_layer_thickness_mm\s=\s\d+\.\d+' , 		#	kisslicers setting
+			'; first_layer_height =' ,						# 	Slic3r
+			'\sZ\\d+.\\d*' ,								#	Simplify3d
+			'G1\sZ\d*\.\d*' ,								#	Slic3r PE
+			'\sZ\\d+.\\d\s' 								#	Cura
+			]
+
+		#	the heigth of layers
+		layer_h = [
+			'layer_thickness_mm\s=\s\d+\.\d+' ,				#	kisslicer
+			'' ,											#	Slic3r
+			';\s+layerHeight.*' ,								#	S3d
+			'; layer_height = \d.\d+' ,						#	Slic3r PE
+			';Layer height: \d.\d+' 						# 	Cura
+			]
+		#	slicers estimate print time
+		time_e = [
+			'\s\s\d*\.\d*\sminutes' , 					#	Kisslicer
+			'; estimated printing time' ,					#	Slic3r
+			';\s+Build time:.*' ,								#	S3d
+			'\d+h?\s?\d+m\s\d+s' ,							#	Slic3r PE
+			';TIME:\\d+'									#	Cura
+			]
+		#	slicers filament usage
+		filament = [
+			'Ext 1 =.*mm' ,									#	Kisslicer
+			';.*filament used =' ,							#	Slic3r
+			';.*Filament length: \d+.*\(' ,					#	S3d
+			'.*filament\sused\s=\s.*mm' ,					#	Slic3r PE ; filament used =
+			';Filament used: \d*.\d+m'						#	Cura
+			]
+		slicers = [ 
+			'KISSlicer' ,
+			'^Slic3r$' ,
+			'Simplify3D' ,
+			'Slic3r Prusa Edition.*on',
+			'Cura_SteamEngine'
+			]
+		#
+		meta = {
+			"objects_h": -1 ,
+			"first_h": -1 ,
+			"layer_h": -1 ,
+			"time_e": -1 ,
+			"filament": [ -1 ] ,
+			"slicer": "Slicer is not implemented"
+		}
+
+		def calc_time(in_):
+			if in_ == -1: return in_
+			h_str = re.search(re.compile('(\d+(\s)?hours|\d+(\s)?h)'),in_)
+			m_str = re.search(re.compile('(\d+(\s)?minutes|\d+(\s)?m)'),in_)
+			s_str = re.search(re.compile('(\d+(\s)?seconds|\d+(\s)?s)'),in_)
+			dursecs = 0
+			if h_str:
+				dursecs += int( max( re.findall('\d+' , ''.join(h_str.group()) ) ) ) *3600 
+			if m_str:
+				dursecs += int( max( re.findall('\d+' , ''.join(m_str.group()) ) ) ) *60 
+			if s_str:
+				dursecs += int( max( re.findall('\d+' , ''.join(s_str.group()) ) ) )
+			if dursecs == 0:
+				dursecs = int( max( re.findall('\d+' , in_) ) )
+			return dursecs
+			return in_
+
+		#	get 4k lines from file
+		with open(path_, 'rb') as f:
+			cont_ = f.readlines()			#	gimme the whole file
+		int_ = cont_[:2000] + cont_[-2000:] 	# 	build up header and footer
+		pile = " ".join(int_)					#	build a big pile for regex
+		#	determine slicer
+		sl = -1
+		for s_ in slicers:
+			#	resource gunner ?
+			if re.compile(s_).search(pile):
+				meta['slicer'] = s_
+				sl = slicers.index(s_)
+				break
+		#	only grab metadata if we found a slicer
+		if sl > -1 :
+			#import pdb; pdb.set_trace()
+			if objects_h[sl] != "":
+				matches = re.findall(objects_h[sl], pile )
+				meta['objects_h'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?					
+			if layer_h[sl] != "":
+				matches = re.findall(layer_h[sl], pile )
+				meta['layer_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+			if first_h[sl] != "":
+				matches = re.findall(first_h[sl], pile )
+				meta['first_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+			if time_e[sl] != "":
+				matches = re.findall(time_e[sl], pile )
+				meta['time_e'] = max( matches )
+			if filament[sl] != "":
+				matches = re.findall(filament[sl], pile )
+				meta['filament'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
+				meta['filament'] = (meta['filament'],meta['filament']*1000)[sl==4]	#	cura is in m -> translate
+			#
+			#
+			#
+			#	data refining:
+			meta['time_e'] = calc_time(meta['time_e'])	#	bring time to seconds
+		else:
+			self.gcode_reply.append("Your Slicer is not yet implemented.")
+			
+		#	put it in rrf format
+		repl_ = {
+			"err": int(0) ,
+			"size": int(os.stat(path_).st_size) ,
+			"lastModified": str(datetime.datetime.utcfromtimestamp( os.stat(path_).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")) ,
+			"height": float( meta.get("objects_h",1 ) ) ,
+			"firstLayerHeight": meta.get("first_h",1 ) ,
+			"layerHeight": float( meta.get("layer_h",1) ) ,
+			"printTime": int( meta.get("time_e",1) ) ,			# in seconds
+			"filament": [ float( meta.get("filament",1) ) ] ,		# in mm
+			"generatedBy": str( meta.get("slicer","<<Slicer not implemented>>") ) ,
+			"fileName": path_.split("/")[-1] ,
+			"layercount": ( float(meta.get("objects_h",1)) - meta.get("first_h",1) ) / float(meta.get("layer_h",1) ) + 1
+		}
+
+		self.cached_file_info = repl_
+		return repl_
+	###
 
 def load_config(config):
 	return web_dwc2(config)
