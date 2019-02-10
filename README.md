@@ -39,14 +39,14 @@ python2, tornado, gunzip, unzip, wget
 
 ##### oOn arch:
 ```
-pacman -Sy && pacman -S python2 python2-tornado wget gunzip
+sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
 ```
 
 Maybe you´ll need to change the startup system for klipper to access ~/klipper/klippy/klippy.py
 
 ##### on Octopi / Ubuntu / Debian (untested, feedback wanted)
 ```
-apt install python python-pip wget gunzip tar
+sudo apt install python python-pip wget gunzip tar
 ```
 
 Then switch to your klipper user and:
@@ -60,6 +60,7 @@ mkdir -p ~/sdcard/dwc2/web
 cd ~/sdcard/dwc2/web 
 wget -q  https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
+sudo systemctl start klipper
 ```
 
 ### Klipper config example:
