@@ -418,55 +418,55 @@ class web_dwc2:
 			#	looks complicated but should be good maintainable
 			#	the heigth of all objects - regex
 			objects_h = [
-				"^G1 X.*Z.*" ,						# 	kisslicer
-				"" ,								# 	Slic3r
-				"^G1\sZ\d+(.)\d+\sF" ,				# 	S3d
-				"^G1 Z" ,							# 	Slic3r PE
-				"^G\d\s.*Z\d+.\d$"					# 	Cura
+				'\sZ\\d+.\\d*' ,					# 	kisslicer
+				'' ,								# 	Slic3r
+				'\sZ\\d+.\\d*' ,				# 	S3d
+				'G1\sZ\d*\.\d*' ,					# 	Slic3r PE
+				'\sZ\\d+.\\d*'						# 	Cura
 				]
 
 			#	heigth of the first layer
 			first_h = [ 
-				"first_layer_thickness_mm" , 		#	kisslicers setting
-				"; first_layer_height =" ,			# 	Slic3r
-				"; layer 1, Z" ,					#	Simplify3d
-				"; first_layer_height =" ,			#	Slic3r PE
-				";Layer height:" 					#	Cura
+				'first_layer_thickness_mm\s=\s\d+\.\d+' , 		#	kisslicers setting
+				'; first_layer_height =' ,						# 	Slic3r
+				'\sZ\\d+.\\d*' ,								#	Simplify3d
+				'G1\sZ\d*\.\d*' ,								#	Slic3r PE
+				'\sZ\\d+.\\d\s' 								#	Cura
 				]
 
 			#	the heigth of layers
 			layer_h = [
-				"layer_thickness_mm" ,				#	kisslicer
-				"" ,								#	Slic3r
-				";   layerHeight" ,					#	S3d
-				"; layer_height =" , 				#	Slic3r PE
-				";Layer height:" 					# 	Cura
+				'layer_thickness_mm\s=\s\d+\.\d+' ,				#	kisslicer
+				'' ,											#	Slic3r
+				';\s+layerHeight.*' ,								#	S3d
+				'; layer_height = \d.\d+' ,						#	Slic3r PE
+				';Layer height: \d.\d+' 						# 	Cura
 				]
 
 			#	slicers estimate print time
 			time_e = [
-				".*Estimated Build Time:" , 		#	Kisslicer
-				"; estimated printing time" ,		#	Slic3r
-				";   Build time:" ,					#	S3d
-				"; estimated printing time" ,		#	Slic3r PE
-				"^;TIME:\d+"							#	Cura
+				'\s\s\d*\.\d*\sminutes' , 					#	Kisslicer
+				'; estimated printing time' ,					#	Slic3r
+				';\s+Build time:.*' ,								#	S3d
+				'\d+h?\s?\d+m\s\d+s' ,							#	Slic3r PE
+				';TIME:\\d+'									#	Cura
 				]
 
 			#	slicers filament usage
 			filament = [
-				";.*Ext 1 =" ,						#	Kisslicer
-				";.*filament used =" ,				#	Slic3r
-				";.*Filament length: \d+.*\(" ,		#	S3d
-				";.*filament used = \d+.*\(" ,		#	Slic3r PE
-				";Filament used:"					#	Cura
+				'Ext 1 =.*mm' ,									#	Kisslicer
+				';.*filament used =' ,							#	Slic3r
+				';.*Filament length: \d+.*\(' ,					#	S3d
+				'.*filament\sused\s=\s.*mm' ,					#	Slic3r PE ; filament used =
+				';Filament used: \d*.\d+m'						#	Cura
 				]
 
 			slicers = [ 
-				"KISSlicer" ,
-				"Slic3r Prusa Edition" ,
-				"Simplify3D" ,
-				"Slic3r",
-				"Cura_SteamEngine"
+				'KISSlicer' ,
+				'^Slic3r$' ,
+				'Simplify3D' ,
+				'Slic3r Prusa Edition.*on',
+				'Cura_SteamEngine'
 				]
 
 			#
@@ -484,29 +484,22 @@ class web_dwc2:
 
 				if in_ == -1: return in_
 
-				split_ = re.compile('([0-9\.]+)').split(in_) #	seperate list in numbers and words
-
-				h_index = [ i for i, it_ in enumerate(split_) if re.search('(h|hours)', it_) ]   #[0] - 1	#	listposition hours by regx
-				m_index = [ i for i, it_ in enumerate(split_) if re.search('(m|minutes)', it_) ] #[0] - 1   #
+				h_str = re.search(re.compile('(\d+(\s)?hours|\d+(\s)?h)'),in_)
+				m_str = re.search(re.compile('(\d+(\s)?minutes|\d+(\s)?m)'),in_)
+				s_str = re.search(re.compile('(\d+(\s)?seconds|\d+(\s)?s)'),in_)
 
 				dursecs = 0
-
-				if len(h_index) > 0:
-					dursecs += float( split_[h_index[0]-1] ) * 3600
-
-				if len(m_index) > 0:
-					dursecs += float( split_[m_index[0]-1] ) * 60
+				if h_str:
+					dursecs += int( max( re.findall('\d+' , ''.join(h_str.group()) ) ) ) *3600 
+				if m_str:
+					dursecs += int( max( re.findall('\d+' , ''.join(m_str.group()) ) ) ) *60 
+				if s_str:
+					dursecs += int( max( re.findall('\d+' , ''.join(s_str.group()) ) ) )
 
 				if dursecs == 0:
-					dursecs += float(in_)
+					dursecs = int( max( re.findall('\d+' , in_) ) )
 
 				return dursecs
-
-			def calc_first_layer(in_):
-
-				#{'printTime': 4620.0, 'firstLayerHeight': '100%', 'err': 0, 'generatedBy': 'Slic3r  Prusa Edition 1.42.0-alpha3+ on 2019-02-01 at 21:06:48',
-				# 'lastModified': '2019-02-02T10:58:54', 'height': 16.4, 'layerHeight': 0.2, 'filament': [[-1]], 'size': 6324334}
-				in_['first_h'] = float( in_['first_h'].replace("%", "") ) /100 * in_['layer_h']
 
 				return in_
 
@@ -517,63 +510,47 @@ class web_dwc2:
 			pile = " ".join(int_)					#	build a big pile for regex
 
 			#	determine slicer
-			hit_sl = -1
+			sl = -1
 			for s_ in slicers:
 				#	resource gunner ?
 				if re.compile(s_).search(pile):
 					meta['slicer'] = s_
-					hit_sl = slicers.index(s_)
+					sl = slicers.index(s_)
 					break
 
-			#import pdb; pdb.set_trace()
-
 			#	only grab metadata if we found a slicer
-			if hit_sl > -1 :
+			if sl > -1 :
 
-				#	itter over the lines
-				for lin_ in int_:
-					handle_ = lin_.strip()
+				#import pdb; pdb.set_trace()
 
-					#	objects_heigth
-					if objects_h[hit_sl] != "" and re.compile(objects_h[hit_sl]).match(handle_):
-						spl_ = re.compile("((Z|z)?[-+]?[0-9]*\.?[0-9])").split(handle_)
-						for i_ in spl_:
-							if i_ is not None:
-								if len(i_) > 1 and re.compile("(z|Z)").match(i_):
-									meta['objects_h'] = float( i_.replace("z","").replace("Z","") )
+				if objects_h[sl] != "":
+					matches = re.findall(objects_h[sl], pile )
+					meta['objects_h'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
+					
+				if layer_h[sl] != "":
+					matches = re.findall(layer_h[sl], pile )
+					meta['layer_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
 
-					# 	heigth per layers
-					if layer_h[hit_sl] != "" and layer_h[hit_sl] in handle_:
-						meta['layer_h'] = float( re.compile("(=( )?|:( )?|,( )?)").split(handle_)[-1:][0].replace(" ", "" ) )
+				if first_h[sl] != "":
+					matches = re.findall(first_h[sl], pile )
+					meta['first_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
 
-					#	first layerheigth
-					if first_h[hit_sl] != "" and first_h[hit_sl] in handle_:
-						meta['first_h'] = re.compile("(=( )?|:( )?|,( )?)").split(handle_)[-1:][0].replace(" ", "" )
+				if time_e[sl] != "":
+					matches = re.findall(time_e[sl], pile )
+					meta['time_e'] = max( matches )
 
-					#	estimate printtime
-					if time_e[hit_sl] != "" and re.compile(time_e[hit_sl]).match(handle_):
-						meta['time_e'] = re.compile("(=( )?|:( )?|,( )?)").split(handle_)[-1:][0]
+				if filament[sl] != "":
+					matches = re.findall(filament[sl], pile )
+					meta['filament'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
+					meta['filament'] = (meta['filament'],meta['filament']*1000)[sl==4]	#	cura is in m -> translate
 
-					#	filamentusage
-					if filament[hit_sl] != "" and re.compile(filament[hit_sl]).match(handle_):
-						meta['filament'] = re.findall("\d+\.\d+", handle_)[0]
-						if len( re.findall("\d+\.\d+m", handle_) ) > 0:
-							meta['filament'] = float( meta['filament'].replace("m","") ) * 1000	# well cura is using meters, why not
-						else:
-							meta['filament'] = float(meta['filament'] )
-
-					#	Full slicername
-					if meta['slicer'] in handle_:
-						meta['slicer'] = meta['slicer'] + " " + handle_.split(meta['slicer'])[1]
+				#
+				#
+				#
 
 				#	data refining:
 				meta['time_e'] = calc_time(meta['time_e'])	#	bring time to seconds
 
-				#	there are slicers doin % as firstlayer
-				if meta['first_h'] != -1 and "%" in meta['first_h']:
-					meta = calc_first_layer(meta)
-				else:
-					meta['first_h'] = float(meta['first_h'])
 				return meta
 
 			self.gcode_reply.append("Your Slicer is not yet implemented.")
