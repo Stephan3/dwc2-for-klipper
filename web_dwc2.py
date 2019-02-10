@@ -26,6 +26,7 @@ class web_dwc2:
 		self.adress = config.get( 'listen_adress', "127.0.0.1" )
 		self.port = config.getint( "listen_port", 4711 )
 		self.webpath = config.get( 'web_path', "dwc2/web" )
+		self.printername =  config.get( 'printer_name', "Klipper" )
 		#	klippy objects
 		self.printer = config.get_printer()
 		self.reactor = self.printer.get_reactor()
@@ -655,7 +656,7 @@ class web_dwc2:
 			"axisNames": "XYZ", #+ "".join([ "U" for ex_ in extr_stat ]),
 			"volumes": 1,
 			"mountedVolumes": 1,
-			"name": "Schampus Michel",
+			"name": self.printername,
 			"probe": {
 				"threshold": 100,
 				"height": 0,
