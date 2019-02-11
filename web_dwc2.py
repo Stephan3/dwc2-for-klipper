@@ -1185,9 +1185,11 @@ class web_dwc2:
 			if self.gcode.is_processing_data:
 				for com_ in handover:
 					logging.info( "DWC2 - appending gcode to klippy queue: " + com_ )
+					self.gcode_reply.append(">>Gcode over pending_commands>>")
 					self.gcode.pending_commands.append(com_)
 			else:
 				logging.info( "DWC2 - sending gcode: " + json.dumps( handover ) )
+				self.gcode_reply.append(">>Gcode over process_commands>>")
 				self.gcode.is_processing_data = True
 				self.gcode.process_commands( handover )
 				self.gcode.is_processing_data = False
