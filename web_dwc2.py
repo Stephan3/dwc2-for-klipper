@@ -127,24 +127,30 @@ class web_dwc2:
 		#dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
+
 		def initialize(self, p_):
 			self.web_root = p_
+
 		def get(self):
 			def index():
-				rq_path = self.web_root + self.request.uri
+				rq_path = self.web_root + self.request.uri + "/index.html"
 				logging.info(" DWC2 - serving path: " + rq_path + "\n")
 				self.render( rq_path )
 
-			if self.request.uri == "/":
+			if self.request.uri == "/":	#	redirect ti index.html(dwc2)
 				index()
-			elif self.request.uri == "/dwc.json":
-				if not os.path.isfile(self.web_root + self.request.uri):
-					self.write( json.dumps( {"err":1} ) )
-					self.finish()
+			elif ".htm" in self.request.uri: # covers others like dwc1
+				self.render( self.web_root + self.request.uri )
+			elif ".json" in self.request.uri: # covers dwc1 settingsload
+				if os.path.isfile(self.web_root + self.request.uri):
+					pass
+				else:
+					self.write( { "err": 1 } )
 			elif os.path.isfile(self.web_root + self.request.uri):
 				with open(self.web_root + self.request.uri, "rb") as f:
 					self.write( f.read() )
 					self.finish()
+
 			else:
 				logging.warn( "DWC2 - unhandled request in dwc_handler: " + self.request.uri + " redirecting to index.")
 				index()
@@ -193,6 +199,10 @@ class web_dwc2:
 			#	gcode request
 			elif "rr_gcode" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_gcode( self.get_argument('gcode') )
+
+			#	disconnect
+			elif "/rr_disconnect" in self.request.uri:
+				self.repl_ = { "err" : 0 }
 
 			#	filehandling - dircreation
 			elif "rr_mkdir" in self.request.uri:
@@ -361,7 +371,7 @@ class web_dwc2:
 		#	creating the infoblock
 		repl_ = { 
 			"dir": web_.get_argument('dir'),
-			"first": web_.get_argument('first'),
+			"first": web_.get_argument('first', 0),
 			"files": [],
 			"next":0
 		}
@@ -373,9 +383,7 @@ class web_dwc2:
 
 			#	append elements to files list matching rrf syntax
 			for el_ in os.listdir(path_):
-
 				el_path = path_ + "/" + el_
-
 				repl_['files'].append({
 					"type": "d" if os.path.isdir(el_path) else "f" ,
 					"name": str(el_) ,
@@ -386,11 +394,8 @@ class web_dwc2:
 		else:#	klipper does not like subpath on sdcard
 
 			path_ = path_.replace("/gcodes", "")
-
 			for el_ in os.listdir(path_):
-
 				el_path = path_ + "/" + el_
-
 				if os.path.isfile(el_path):
 
 					repl_['files'].append({
