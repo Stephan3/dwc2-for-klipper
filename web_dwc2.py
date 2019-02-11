@@ -555,7 +555,7 @@ class web_dwc2:
 				"requested": 0,
 				"top": gcode_stats['speed']	/ 60	#	not ecxatly the same but comes close
 			},
-			"currentTool": 0,
+			"currentTool": 1,	#	must be at least 1 ! learned the hardway....
 			"params": {
 				"atxPower": 0,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
@@ -635,7 +635,7 @@ class web_dwc2:
 				"requested": 0 ,
 				"top": gcode_stats['speed']	/ 60	#	not ecxatly the same but comes close
 			},
-			"currentTool": 0 ,
+			"currentTool": 1 ,
 			"params": {
 				"atxPower": 0 ,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
