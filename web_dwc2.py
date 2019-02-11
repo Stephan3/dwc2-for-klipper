@@ -124,7 +124,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		dbg.start()
+		#dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
 		def initialize(self, p_):
@@ -950,25 +950,21 @@ class web_dwc2:
 	#	rrf run macro
 	def cmd_M98(self, params):
 
-		# Execute file, used for macro execution
-
 		path = self.sdpath + "/" + params['#original'].split(" ")[1].replace("P\"0:/", "").replace("\"", "")
 
 		if not os.path.exists(path):
 			#	now we know its no macro file
-			klipma = params['#original'].split("/")[2].replace("\"", "")
-			self.gcode_queue.append(klipma)
-			return 0
-
+			klipma = params['#original'].split("/")[-1].replace("\"", "")
+			if klipma in self.klipper_macros:
+				return klipma
+			else:
+				return 0
 		else:
 			#	now we know its a macro from dwc
 			with open( path ) as f:
 				lines = f.readlines()
 
-			for com_ in [x.strip() for x in lines]:
-				self.gcode_queue.append( str(com_) )
-
-			return 0
+			return lines
 
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
@@ -1091,19 +1087,19 @@ class web_dwc2:
 
 			if self.gcode.gcode_help[key_] == "G-Code macro":
 
-				self.klipper_macros.append( key_.lower() )
+				self.klipper_macros.append( key_.upper() )
 
 	#	callback for reactor
 	def gcode_callback(self, eventtime):
 
 		now = self.reactor.monotonic()
-		commands = []
+		handover = []
+
+		# cover emergencys just do it now!!
+		if len([ True for s in self.gcode_queue if "M112".lower() in s.lower() ]) > 0:
+			self.cmd_M112("1")
 
 		for com_ in self.gcode_queue :
-
-			# cover emergencys just do it now!!
-			if len([ True for s in self.gcode_queue if "M112".lower() in s.lower() ]) > 0:
-				self.cmd_M112("1")
 
 			command = com_.replace(" \"0:","")
 			params = self.parse_params(command)
@@ -1138,20 +1134,20 @@ class web_dwc2:
 			}
 
 			#	handle unsupported commands
-			if params['#command'].upper() not in supported_gcode and not params['#command'] in self.klipper_macros:
+			if params['#command'].upper() not in supported_gcode:
 				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
 				self.gcode_queue.remove(com_)
 				continue
 
-			#	if we are midprint, do it directly to klippers object without gcode_queue
+			#	if we are midprint, do it directly to klippers object without gcode_queue 	#	recheck this with new gcode execution
 			if self.get_printer_status(now) == "P":
 				self.gcode_queue.remove(com_)
 				func_ = mid_print_allow.get(params['#command'])
-				if func_ is not None:
+				if func_:
 					func_(params)
-					continue
 				else:
 					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
+					self.gcode_queue.remove(com_)
 					continue
 
 			#	handle rrfs specials
@@ -1159,6 +1155,7 @@ class web_dwc2:
 				func_ = rrf_commands.get(params['#command'])
 				command = func_(params)
 				if command == 0:
+					self.gcode_queue.remove(com_)
 					continue
 
 			if type(command) == str:
@@ -1169,20 +1166,21 @@ class web_dwc2:
 				logging.error( "DWC2 - Error in commandtype " + str(type(command)) )
 				self.gcode_queue.remove(com_)
 				continue
-
+			print(appendors)
 			for c in appendors:
-				commands.append( c )
+				handover.append( c )
 
-		if commands:
-			self.gcode_queue = []
+			self.gcode_queue.remove(com_)
+
+		if handover:
 			if self.gcode.is_processing_data:
-				for com_ in commands:
+				for com_ in handover:
 					logging.info( "DWC2 - appending gcode to klippy queue: " + com_ )
 					self.gcode.pending_commands.append(com_)
 			else:
-				logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
+				logging.info( "DWC2 - sending gcode: " + json.dumps( handover ) )
 				self.gcode.is_processing_data = True
-				self.gcode.process_commands( commands )
+				self.gcode.process_commands( handover )
 				self.gcode.is_processing_data = False
 
 		return
