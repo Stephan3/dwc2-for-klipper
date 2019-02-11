@@ -131,17 +131,20 @@ class web_dwc2:
 			self.web_root = p_
 		def get(self):
 			def index():
-				rq_path = self.web_root + "/index.html"
+				rq_path = self.web_root + self.request.uri
 				logging.info(" DWC2 - serving path: " + rq_path + "\n")
 				self.render( rq_path )
+
 			if self.request.uri == "/":
 				index()
-			elif self.request.uri == "/favicon.ico":
-				rq_path = self.web_root + "/favicon.ico"
-				with open(rq_path, "rb") as f:
+			elif self.request.uri == "/dwc.json":
+				if not os.path.isfile(self.web_root + self.request.uri):
+					self.write( json.dumps( {"err":1} ) )
+					self.finish()
+			elif os.path.isfile(self.web_root + self.request.uri):
+				with open(self.web_root + self.request.uri, "rb") as f:
 					self.write( f.read() )
 					self.finish()
-
 			else:
 				logging.warn( "DWC2 - unhandled request in dwc_handler: " + self.request.uri + " redirecting to index.")
 				index()
@@ -1135,9 +1138,10 @@ class web_dwc2:
 
 			#	handle unsupported commands
 			if params['#command'].upper() not in supported_gcode:
-				self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
-				self.gcode_queue.remove(com_)
-				continue
+				if params['#command'].upper() not in self.klipper_macros:
+					self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
+					self.gcode_queue.remove(com_)
+					continue
 
 			#	if we are midprint, do it directly to klippers object without gcode_queue 	#	recheck this with new gcode execution
 			if self.get_printer_status(now) == "P":
