@@ -58,9 +58,17 @@ git clone https://your_git_user_here@github.com/Stephan3/dwc2-for-klipper.git
 ln -s ~/dwc2-for-klipper/web_dwc2.py ~/klipper/klippy/extras/web_dwc2.py
 mkdir -p ~/sdcard/dwc2/web
 cd ~/sdcard/dwc2/web 
-wget -q  https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
+wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 sudo systemctl start klipper
+```
+
+##### if you want backwards compatibility to dwc1:
+```
+cd ~/sdcard/dwc2/web 
+wget https://github.com/chrishamm/DuetWebControl/releases/download/1.22.5/DuetWebControl-1.22.5.zip
+unzip DuetWebControl-1.22.5.zip
+for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 ```
 
 ### Klipper config example:
