@@ -55,7 +55,10 @@ class web_dwc2:
 			return
 		# manage client sessions
 		self.sessions = {}
-		#	parse klipper macros
+		self.status_0 = {}
+		self.status_1 = {}
+		self.status_2 = {}
+		self.status_3 = {}
 		self.dwc2()
 		logging.basicConfig(level=logging.DEBUG)
 
@@ -209,20 +212,24 @@ class web_dwc2:
 			elif "rr_status" in self.request.uri:
 
 				if not self.web_dwc2.klipper_ready:
-					self.repl_ = self.web_dwc2.rr_status_0()
+					self.web_dwc2.rr_status_0()
+					self.repl_ = self.web_dwc2.status_0
 
 				else:
 					# there are 3 types of status requests:
 					t_ = int( self.get_argument('type') )
 
 					if t_ == 1:
-						self.repl_ = self.web_dwc2.rr_status_1()
+						self.web_dwc2.rr_status_1()
+						self.repl_ = self.web_dwc2.status_1
 
 					elif t_ == 2:
-						self.repl_ = self.web_dwc2.rr_status_2()
+						self.web_dwc2.rr_status_2()
+						self.repl_ = self.web_dwc2.status_2
 
 					elif t_ == 3:
-						self.repl_ = self.web_dwc2.rr_status_3()
+						self.web_dwc2.rr_status_3()
+						self.repl_ = self.web_dwc2.status_3
 
 					else:
 						logging.warn(" DWC2 - error in rr_status \n" + str(t_) )
@@ -483,7 +490,7 @@ class web_dwc2:
 
 		#	just put in things really needed to make dwc2 happy
 
-		repl_ = {
+		self.status_0.update({
 			"status": self.get_printer_status(0),
 			"seq": len(self.gcode_reply),
 			"coords": {
@@ -514,9 +521,7 @@ class web_dwc2:
 			"volumes": 1,
 			"mountedVolumes": 1 ,
 			"name": self.printername
-		}
-
-		return repl_
+		})
 
 	#	dwc rr_status 1
 	def rr_status_1(self):
@@ -530,7 +535,7 @@ class web_dwc2:
 		else:
 			fan_stats = []
 
-		repl_ = {
+		self.status_1.update({
 			"status": self.get_printer_status(now),
 			"coords": {
 				"axesHomed": self.get_axes_homed(),
@@ -581,21 +586,21 @@ class web_dwc2:
 					}
 				]
 			},
-			"time": self.start_time - time.time()
-		}
+			"time": time.time() - self.start_time
+		})
 
 		if self.chamber:
 			chamber_stats = self.chamber.get_status(0)
-			repl_['temps'].update({ "chamber": {
+			self.status_1['temps'].update({
+				"chamber": {
 					"current": chamber_stats.get("temp") ,
 					"active": chamber_stats.get("target", -1) ,
 					"state": chamber_stats.get("state") ,
 					"heater": 2 ,	#	extruders + bett ?
-				} })
-			repl_['temps']['current'].append( chamber_stats.get("temp") )
-			repl_['temps']['state'].append( chamber_stats.get("state") )
-
-		return repl_
+					},
+					"current": self.status_1['temps']['current'] + [ chamber_stats.get("temp") ],
+					"state": self.status_1['temps']['state'] + [ chamber_stats.get("state") ] ,
+				})
 
 	#	dwc rr_status 2
 	def rr_status_2(self):
@@ -610,7 +615,7 @@ class web_dwc2:
 			fan_stats = []
 
 		#	dummy data
-		repl_ = {
+		self.status_2.update({
 			"status": self.get_printer_status(now) ,
 			"coords": {
 				"axesHomed": self.get_axes_homed() ,
@@ -663,7 +668,7 @@ class web_dwc2:
 					}
 				]
 			},
-			"time": self.start_time - time.time(),
+			"time": time.time() - self.start_time,
 			"coldExtrudeTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] ),
 			"coldRetractTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] ),
 			"compensation": "None",
@@ -686,7 +691,7 @@ class web_dwc2:
 			"tools": [
 				{
 					"number": extr_stat.index(ex_) + 1 ,
-					"name": "rainer",
+					"name": "",
 					"heaters": [ extr_stat.index(ex_) + 1 ],
 					"drives": [	extr_stat.index(ex_) ] ,
 					"axisMap": [ 1 ],
@@ -705,19 +710,19 @@ class web_dwc2:
 			#	"cur": 24.3,
 			#	"max": 24.5
 			#}
-		}
+		})
 		if self.chamber:
 			chamber_stats = self.chamber.get_status(0)
-			repl_['temps'].update({ "chamber": {
+			self.status_2['temps'].update({ 
+				"chamber": {
 					"current": chamber_stats.get("temp") ,
 					"active": chamber_stats.get("target", -1) ,
 					"state": chamber_stats.get("state") ,
 					"heater": 2 ,	#	extruders + bett ?
-				} })
-			repl_['temps']['current'].append( chamber_stats.get("temp") )
-			repl_['temps']['state'].append( chamber_stats.get("state") )
-
-		return repl_
+					},
+					"current": self.status_2['temps']['current'] + [ chamber_stats.get("temp") ],
+					"state": self.status_2['temps']['state'] + [ chamber_stats.get("state") ] ,
+				})
 
 	#	dwc rr_status 3
 	def rr_status_3(self):
@@ -758,9 +763,6 @@ class web_dwc2:
 				self.print_data['zhop'] = False
 			if self.z_mean == gcode_stats['last_zpos'] \
 					and self.print_data['zhop']:
-				# now we know layer switched
-				#logging.info( "CHANGELAYER" + str(self.z_mean) )
-				#self.print_data['last_zposes'] = [ gcode_stats['last_zpos'] for x in self.print_data['last_zposes'] ]
 				self.print_data['zhop'] = False
 				#
 				if self.print_data['firstlayer_dur'] == 0:
@@ -790,7 +792,7 @@ class web_dwc2:
 
 		manage_print_data()
 
-		repl_ = {
+		self.status_3.update({
 			"status": self.get_printer_status(now) ,
 			"coords": {
 				"axesHomed": self.get_axes_homed() ,
@@ -802,11 +804,11 @@ class web_dwc2:
 				"requested": 0 ,
 				"top": gcode_stats['speed'] /60	#	not ecxatly the same but comes close
 			},
-			"currentTool": -1 ,
+			"currentTool": 0 ,
 			"params": {
 				"atxPower": 0 ,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
-				"fanNames": [ "", "", "", "", "", "", "", "", "" ],
+				"fanNames": [ "" for fan_ in fan_stats ],
 				"speedFactor": gcode_stats['speed_factor'] * 100,
 				"extrFactors": [ gcode_stats['extrude_factor'] * 100 ],
 				"babystep": gcode_stats['homing_zpos']
@@ -853,9 +855,20 @@ class web_dwc2:
 								/ sum(self.cached_file_info["filament"]) ) * self.cached_file_info['printTime'],
 				"layer": (1-self.print_data['curr_layer'] / self.cached_file_info['layercount']) * self.cached_file_info['printTime']
 			}
-		}
+		})
 
-		return repl_
+		if self.chamber:
+			chamber_stats = self.chamber.get_status(0)
+			self.status_3['temps'].update({
+				"chamber": {
+					"current": chamber_stats.get("temp") ,
+					"active": chamber_stats.get("target", -1) ,
+					"state": chamber_stats.get("state") ,
+					"heater": 2 ,	#	extruders + bett ?
+					},
+					"current": self.status_3['temps']['current'] + [ chamber_stats.get("temp") ],
+					"state": self.status_3['temps']['state'] + [ chamber_stats.get("state") ] ,
+				})
 
 	#	dwc rr_upload - uploading files to sdcard
 	def rr_upload(self, web_):
@@ -885,6 +898,7 @@ class web_dwc2:
 #
 #
 #
+
 	#	rrf G10 command - set heaterstemp
 	def cmd_G10(self, params):
 
@@ -1004,7 +1018,7 @@ class web_dwc2:
 		if self.klipper_ready:
 			stat_ = self.get_printer_status(0)
 			if stat_ in [ "S", "P", "D" ]:
-				#SPD? printing state
+				#SPD? seriously? printing state
 				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
 
 		self.gcode_reply.append(msg)
@@ -1082,8 +1096,6 @@ class web_dwc2:
 	#	callback for reactor
 	def gcode_callback(self, eventtime):
 
-		logging.info( "incomming callback" )
-		#	if klipper is in ready state
 		now = self.reactor.monotonic()
 		commands = []
 
@@ -1110,7 +1122,7 @@ class web_dwc2:
 			#	filter crap and implement em step by step. 
 			supported_gcode = [ 
 				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M141", "M220",
-				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS" ]
+				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS", "T_TILT_ADJUST" ]
 
 			#	midprint ecxecutions directly to klippy
 			mid_print_allow = {
@@ -1169,7 +1181,9 @@ class web_dwc2:
 					self.gcode.pending_commands.append(com_)
 			else:
 				logging.info( "DWC2 - sending gcode: " + json.dumps( commands ) )
+				self.gcode.is_processing_data = True
 				self.gcode.process_commands( commands )
+				self.gcode.is_processing_data = False
 
 		return
 		#import pdb; pdb.set_trace()
@@ -1383,7 +1397,19 @@ class web_dwc2:
 
 		self.cached_file_info = repl_
 		return repl_
-	###
+
+	def dict_compare(self, d1, d2):
+
+		#	self.dict_compare( self.status_1 , self.status_2 )
+		for key_ in d1.keys():
+
+			if d1.get(key_) != d2.get(key_) :
+
+				print( key_ + " is different in d2.:\nd1:")
+				print( json.dumps(d1.get(key_)) )
+				print("vs d2 :")
+				print(json.dumps(d2.get(key_)))
+				print("\n")
 
 def load_config(config):
 	return web_dwc2(config)
