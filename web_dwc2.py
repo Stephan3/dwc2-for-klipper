@@ -192,6 +192,10 @@ class web_dwc2:
 			elif "rr_filelist" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_filelist(self)
 
+			#	filehandling - dirlisting for dwc 1
+			elif "rr_files" in self.request.uri:
+				self.repl_ = { "err" : 1 }
+
 			#	filehandling - fileinfo / gcodeinfo
 			elif "rr_fileinfo" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_fileinfo(self)
@@ -369,11 +373,11 @@ class web_dwc2:
 		path_ = self.sdpath + web_.get_argument('dir').replace("0:", "")
 
 		#	creating the infoblock
-		repl_ = { 
-			"dir": web_.get_argument('dir'),
-			"first": web_.get_argument('first', 0),
-			"files": [],
-			"next":0
+		repl_ = {
+			"dir": web_.get_argument('dir') ,
+			"first": web_.get_argument('first', 0) ,
+			"files": [] ,
+			"next": 0
 		}
 		if not "/gcodes" in path_:
 
@@ -972,7 +976,7 @@ class web_dwc2:
 			with open( path ) as f:
 				lines = f.readlines()
 
-			return lines
+			return [x.strip() for x in lines]
 
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
@@ -1391,7 +1395,6 @@ class web_dwc2:
 
 		#	put it in rrf format
 		repl_ = {
-			"err": int(0) ,
 			"size": int(os.stat(path_).st_size) ,
 			"lastModified": str(datetime.datetime.utcfromtimestamp( os.stat(path_).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")) ,
 			"height": float( meta.get("objects_h",1 ) ) ,
