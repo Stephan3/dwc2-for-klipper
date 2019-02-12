@@ -174,48 +174,39 @@ class web_dwc2:
 			# dwc connect request
 			if "rr_connect" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_connect(self)
-
 			#	there is no rr_configfile so return empty
 			elif "rr_configfile" in self.request.uri:
 				self.repl_ = { "err" : 0 }
-
 			elif "rr_config" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_config()
-
 			#	filehandling - delete files/folders
 			elif "rr_delete" in self.request.uri:
-				self.web_dwc2.rr_delete( self )
-				return
-
+				self.repl_ = self.web_dwc2.rr_delete( self )
+			#	disconnect
+			elif "/rr_disconnect" in self.request.uri:
+				self.repl_ = { "err" : 0 }
+			#	filehandling . download
+			elif "rr_download" in self.request.uri:
+				self.repl_ = self.web_dwc2.rr_download(self)
 			#	filehandling - dirlisting
 			elif "rr_filelist" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_filelist(self)
-
 			#	filehandling - dirlisting for dwc 1
 			elif "rr_files" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_files(self)
-
 			#	filehandling - fileinfo / gcodeinfo
 			elif "rr_fileinfo" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_fileinfo(self)
-
 			#	gcode request
 			elif "rr_gcode" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_gcode( self )
 				return
-
-			#	disconnect
-			elif "/rr_disconnect" in self.request.uri:
-				self.repl_ = { "err" : 0 }
-
 			#	filehandling - dircreation
 			elif "rr_mkdir" in self.request.uri:
 				self.web_dwc2.rr_mkdir(self)
 				return
-
 			elif "rr_move" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_move(self)
-
 			#	gcode reply
 			elif "rr_reply" in self.request.uri:
 				while self.web_dwc2.gcode_reply:
@@ -249,10 +240,6 @@ class web_dwc2:
 					else:
 						logging.warn(" DWC2 - error in rr_status \n" + str(t_) )
 
-			#	getn files
-			elif "rr_download" in self.request.uri:
-				self.web_dwc2.rr_download(self)
-				return
 
 			if self.repl_ == {"err":1}:
 				logging.warn("DWC2 - unhandled ?GET? " + self.request.uri)
@@ -261,13 +248,17 @@ class web_dwc2:
 				self.write( json.dumps(self.repl_) )
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
-				import pdb; pdb.set_trace()
 
 		def post(self, *args):
 
+			#	filehandling - uploads
 			if "rr_upload" in self.request.uri:
-				self.web_dwc2.rr_upload(self)
-				return
+				self.repl_ = self.web_dwc2.rr_upload(self)
+
+			try:
+				self.write( json.dumps(self.repl_) )
+			except Exception as e:
+				logging.warn( "DWC2 - error in write: " + str(e) )
 
 	#	dwc rr_connect
 	def rr_connect(self, web_):
@@ -970,11 +961,11 @@ class web_dwc2:
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
-		file = "/".join(params['#original'].split('/')[1:])
-		if not file:	#	DWC 1 work arround
-			fullpath = self.sdpath + "/gcodes/" + params['#original'].split()[1]
+		file = '/'.join(params['#original'].split(' ')[1:])
+		if 'gcodes' not in file:	#	DWC 1 work arround
+			fullpath = self.sdpath + '/gcodes/' + params['#original'].split()[1]
 		else:
-			fullpath = self.sdpath + "/" + file
+			fullpath = self.sdpath + '/' + file
 
 		#	load a file to scurrent_file if its none
 		if not self.sdcard.current_file:
@@ -989,9 +980,9 @@ class web_dwc2:
 				self.print_data = None 								#	reset printdata as this is a new print
 			else:
 				import pdb; pdb.set_trace()
-				raise "gcodefile" + fullpath + " not found"
+				raise 'gcodefile' + fullpath + ' not found'
 
-		return "M24"
+		return 'M24'
 	#	rrf run macro
 	def cmd_M98(self, params):
 
@@ -1035,7 +1026,8 @@ class web_dwc2:
 			self.gcode_reply.append("!! Only idiots try to babystep withoung homing !!")
 			return 0
 
-		mm_step = self.gcode.get_float('Z', params)
+		mm_step = self.gcode.get_float('Z', params, None)
+		if not mm_step: mm_step = self.gcode.get_float('S', params, None)	#	DWC 1 workarround
 		params = self.parse_params("SET_GCODE_OFFSET Z_ADJUST%0.2f" % mm_step)
 		self.gcode.cmd_SET_GCODE_OFFSET(params)
 		self.gcode_reply.append("Z adjusted by %0.2f" % mm_step)
