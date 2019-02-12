@@ -473,6 +473,7 @@ class web_dwc2:
 			self.gcode_queue.append(handover)
 
 		self.reactor.register_callback(self.gcode_reactor_callback)
+
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
 
@@ -1273,8 +1274,13 @@ class web_dwc2:
 		return repl_
 	#	recall for gcode ecxecution is needed ( threadsafeness )
 	def gcode_reactor_callback(self, eventtime):
-		#import pdb; pdb.set_trace()
+		#	if user adds commands return the callback
+		if self.gcode.is_processing_data:
+			return
+
 		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M104", "M140", "M141" ]
+
+		self.gcode.is_processing_data = True
 
 		while self.gcode_queue:
 
@@ -1282,7 +1288,6 @@ class web_dwc2:
 			logging.error( "entering: " + params['#command'] )
 			try:
 				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
-				self.gcode.is_processing_data = True
 				handler(params)
 			except Exception as e:
 				self.gcode_reply.append( "!! " + str(e) )
@@ -1291,8 +1296,9 @@ class web_dwc2:
 				logging.error( "passed: " + params['#command'] )
 				if params['#command'] in ack_needers:
 					self.gcode_reply.append( "ack" )	#	pseudo ack
-			finally:
-				self.gcode.is_processing_data = False
+
+		self.gcode.is_processing_data = False
+
 	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
 
