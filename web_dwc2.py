@@ -154,7 +154,6 @@ class web_dwc2:
 			else:
 				logging.warn( "DWC2 - unhandled request in dwc_handler: " + self.request.uri + " redirecting to index.")
 				index()
-
 	#for handling request dwc2 is sending
 	class req_handler(tornado.web.RequestHandler):
 
@@ -194,7 +193,7 @@ class web_dwc2:
 
 			#	filehandling - dirlisting for dwc 1
 			elif "rr_files" in self.request.uri:
-				self.repl_ = { "err" : 1 }
+				self.repl_ = self.web_dwc2.rr_files(self)
 
 			#	filehandling - fileinfo / gcodeinfo
 			elif "rr_fileinfo" in self.request.uri:
@@ -329,14 +328,13 @@ class web_dwc2:
 		#	lazymode_
 		path_ = self.sdpath + web_.get_argument('name').replace("0:", "")
 
-		if "/gcodes" in path_:
-			path_ = path_.replace("/gcodes", "")
+		if os.path.isdir(path_):
+			shutil.rmtree(path_)
 
-		if os.path.exists(path_):
-			try:
-				os.remove(path_)
-			except: 
-				os.removedirs(path_)
+		if os.path.isfile(path_):
+			os.remove(path_)
+
+		return {'err': 0}
 	#	dwc rr_download - lacks logging
 	def rr_download(self, web_):
 
@@ -364,6 +362,48 @@ class web_dwc2:
 
 			#	else errors
 			web_.write( json.dumps( {"err":1} ) )
+	#	dwc rr_files - dwc1 thing
+	def rr_files(self, web_):
+		#		{
+		#			"dir":"0:/gcodes",
+		#			"first":0,
+		#			"files":[
+		#				"testcube.gcode",
+		#				"Hevo",
+		#				"xy_joint_backbrace_left.gcode",
+		#				"VORON",
+		#				"Calibration",
+		#				"Hevo_Fusion",
+		#				"blabla",
+		#				"3D_Scanner",
+		#				"Alex",
+		#				"Hevo_Reinforced",
+		#				"snurk_ring_2cm_Type1-_V2.gcode",
+		#				"*Hevo_RS",
+		#				"Fucktopus_easy.gcode"],
+		#			"next":0,
+		#			"err":0
+		#		}
+		path_ = self.sdpath + web_.get_argument('dir').replace("0:", "")
+
+		repl_ = {
+			"dir": web_.get_argument('dir') ,
+			"first": web_.get_argument('first', 0) ,
+			"files": [] ,
+			"next": 0 ,
+			"err": 0
+		}
+
+		#	if rrf is requesting directory, it has to be there.
+		if not os.path.exists(path_):
+			os.makedirs(path_)
+
+		#	append elements to files list matching rrf syntax
+		for el_ in os.listdir(path_):
+			el_path = path_ + "/" + el_
+			repl_['files'].append( "*" + str(el_) if os.path.isdir(el_path) else str(el_) )
+
+		return repl_
 	#	dwc rr_filelist
 	def rr_filelist(self, web_):
 
@@ -473,7 +513,6 @@ class web_dwc2:
 			self.gcode_queue.append(handover)
 
 		self.reactor.register_callback(self.gcode_reactor_callback)
-
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
 
@@ -491,6 +530,16 @@ class web_dwc2:
 			return {"err": 1}
 
 		return {"err": 0}
+	#	dwc rr_mkdir
+	def rr_mkdir(self, web_):
+
+		path_ = self.sdpath + web_.get_argument('dir').replace("0:", "")
+
+		if not os.path.exists(path_):
+			os.makedirs(path_)
+			return {'err': 0}
+
+		return {'err': 1}
 	# 	rr_status_0 if klipper is down/failed to start
 	def rr_status_0(self):
 
@@ -808,7 +857,7 @@ class web_dwc2:
 				"requested": 0 ,
 				"top": gcode_stats['speed'] /60	#	not ecxatly the same but comes close
 			},
-			"currentTool": 0 ,
+			"currentTool": 1 ,
 			"params": {
 				"atxPower": 0 ,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
@@ -890,6 +939,8 @@ class web_dwc2:
 
 		with open(path_, 'w') as out:
 			out.write(web_.request.body)
+
+		if os.path.isfile(path_):
 			ret_ = {"err":0}
 
 		return ret_
@@ -920,7 +971,10 @@ class web_dwc2:
 	def cmd_M32(self, params):
 
 		file = "/".join(params['#original'].split('/')[1:])
-		fullpath = self.sdpath + "/" + file
+		if not file:	#	DWC 1 work arround
+			fullpath = self.sdpath + "/gcodes/" + params['#original'].split()[1]
+		else:
+			fullpath = self.sdpath + "/" + file
 
 		#	load a file to scurrent_file if its none
 		if not self.sdcard.current_file:
@@ -934,6 +988,7 @@ class web_dwc2:
 				self.cached_file_info = self.read_gcode(fullpath) 	#	refresh cached file info - its used during printng
 				self.print_data = None 								#	reset printdata as this is a new print
 			else:
+				import pdb; pdb.set_trace()
 				raise "gcodefile" + fullpath + " not found"
 
 		return "M24"
@@ -1268,7 +1323,8 @@ class web_dwc2:
 			"filament": [ float( meta.get("filament",1) ) ] ,		# in mm
 			"generatedBy": str( meta.get("slicer","<<Slicer not implemented>>") ) ,
 			"fileName": '0:' + str(path_).replace(self.sdpath, '') ,
-			"layercount": ( float(meta.get("objects_h",1)) - meta.get("first_h",1) ) / float(meta.get("layer_h",1) ) + 1
+			"layercount": ( float(meta.get("objects_h",1)) - meta.get("first_h",1) ) / float(meta.get("layer_h",1) ) + 1 ,
+			"err": 0
 		}
 
 		return repl_
