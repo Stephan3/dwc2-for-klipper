@@ -18,6 +18,10 @@ import shutil
 
 class web_dwc2:
 
+##
+#	Stuff arround klippers extras logic
+##
+	#	init who?
 	def __init__(self, config):
 
 		self.klipper_ready = False
@@ -61,7 +65,7 @@ class web_dwc2:
 		self.status_3 = {}
 		self.dwc2()
 		logging.basicConfig(level=logging.DEBUG)
-
+	#	function once reactor calls, once klipper feels good
 	def handle_ready(self):
 		#	klippy related
 		self.toolhead = self.printer.lookup_object('toolhead', None)
@@ -90,6 +94,10 @@ class web_dwc2:
 		logging.info( "DWC2 shuting down - as klippy is shutdown" )
 		self.http_server.stop()
 		self.sessions = {}
+
+##
+#	Webserver and related
+##
 	#	launch webserver
 	def dwc2(self):
 		def tornado_logger(req):
@@ -260,6 +268,9 @@ class web_dwc2:
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
 
+##
+#	All the crazy shit dc42 fiddled together in c
+##
 	#	dwc rr_connect
 	def rr_connect(self, web_):
 
@@ -335,10 +346,6 @@ class web_dwc2:
 		if "/sys/" in path_ and "config.g" in web_.get_argument('name').replace("0:", ""):
 			path_ = self.klipper_config
 
-		#	klipper hates subpath for sdcardprints.
-		if "/gcodes" in path_:
-			path_ = path_.replace("/gcodes", "")
-
 		if os.path.isfile(path_):
 
 			#	handles regular files
@@ -347,12 +354,10 @@ class web_dwc2:
 
 			with open(path_, "rb") as f:
 				web_.write( f.read() )
-				web_.finish()
 
+			return {'err':0}
 		else:
-
-			#	else errors
-			web_.write( json.dumps( {"err":1} ) )
+			return {"err":1}
 	#	dwc rr_files - dwc1 thing
 	def rr_files(self, web_):
 		#		{
@@ -936,9 +941,9 @@ class web_dwc2:
 
 		return ret_
 
-#
-#
-#
+##
+#	Gcode execution related stuff
+##
 
 	#	rrf G10 command - set heaterstemp
 	def cmd_G10(self, params):
@@ -1049,6 +1054,32 @@ class web_dwc2:
 		self.gcode_reply.append(msg)
 
 		#import pdb; pdb.set_trace()
+	#	recall for gcode ecxecution is needed ( threadsafeness )
+	def gcode_reactor_callback(self, eventtime):
+		#	if user adds commands return the callback
+		if self.gcode.is_processing_data:
+			return
+
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M104", "M140", "M141" ]
+
+		self.gcode.is_processing_data = True
+
+		while self.gcode_queue:
+
+			params = self.parse_params(self.gcode_queue.pop(0))
+			logging.error( "entering: " + params['#command'] )
+			try:
+				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
+				handler(params)
+			except Exception as e:
+				self.gcode_reply.append( "!! " + str(e) )
+				logging.error( "failed: " + params['#command'] + str(e) )
+			else:
+				logging.error( "passed: " + params['#command'] )
+				if params['#command'] in ack_needers:
+					self.gcode_reply.append( "ack" )	#	pseudo ack
+
+		self.gcode.is_processing_data = False
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line):
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
@@ -1071,6 +1102,11 @@ class web_dwc2:
 
 		return params
 	#	return status for infoblock parts taken from Fheilmann
+
+##
+#	Helper functions getting/parsing data
+##
+
 	def get_printer_status(self, now):
 
 		#	case 'F': return 'updating';
@@ -1320,32 +1356,7 @@ class web_dwc2:
 		}
 
 		return repl_
-	#	recall for gcode ecxecution is needed ( threadsafeness )
-	def gcode_reactor_callback(self, eventtime):
-		#	if user adds commands return the callback
-		if self.gcode.is_processing_data:
-			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M104", "M140", "M141" ]
-
-		self.gcode.is_processing_data = True
-
-		while self.gcode_queue:
-
-			params = self.parse_params(self.gcode_queue.pop(0))
-			logging.error( "entering: " + params['#command'] )
-			try:
-				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
-				handler(params)
-			except Exception as e:
-				self.gcode_reply.append( "!! " + str(e) )
-				logging.error( "failed: " + params['#command'] + str(e) )
-			else:
-				logging.error( "passed: " + params['#command'] )
-				if params['#command'] in ack_needers:
-					self.gcode_reply.append( "ack" )	#	pseudo ack
-
-		self.gcode.is_processing_data = False
 
 	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
