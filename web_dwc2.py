@@ -133,8 +133,7 @@ class web_dwc2:
 
 		def get(self):
 			def index():
-				rq_path = self.web_root + self.request.uri + "/index.html"
-				logging.info(" DWC2 - serving path: " + rq_path + "\n")
+				rq_path = self.web_root + "/index.html"
 				self.render( rq_path )
 
 			if self.request.uri == "/":	#	redirect ti index.html(dwc2)
@@ -202,7 +201,8 @@ class web_dwc2:
 
 			#	gcode request
 			elif "rr_gcode" in self.request.uri:
-				self.repl_ = self.web_dwc2.rr_gcode( self.get_argument('gcode') )
+				self.repl_ = self.web_dwc2.rr_gcode( self )
+				return
 
 			#	disconnect
 			elif "/rr_disconnect" in self.request.uri:
@@ -218,11 +218,9 @@ class web_dwc2:
 
 			#	gcode reply
 			elif "rr_reply" in self.request.uri:
-				if len( self.web_dwc2.gcode_reply ) > 0 :
-					for repl_ in self.web_dwc2.gcode_reply:
-						self.write( repl_ + "\n" )
-						logging.debug( "handover gcode_reply to webif: " + repl_ )
-					self.web_dwc2.gcode_reply = []
+				while self.web_dwc2.gcode_reply:
+					msg = self.web_dwc2.gcode_reply.pop(0).replace("!!", "Error: ")
+					self.write( msg )
 				return
 
 			#	status replys
@@ -324,7 +322,7 @@ class web_dwc2:
 		}
 
 		return repl_
-
+	#	simple dir/fileremover
 	def rr_delete(self, web_):
 
 		#	lazymode_
@@ -338,7 +336,6 @@ class web_dwc2:
 				os.remove(path_)
 			except: 
 				os.removedirs(path_)
-
 	#	dwc rr_download - lacks logging
 	def rr_download(self, web_):
 
@@ -366,7 +363,6 @@ class web_dwc2:
 
 			#	else errors
 			web_.write( json.dumps( {"err":1} ) )
-
 	#	dwc rr_filelist
 	def rr_filelist(self, web_):
 
@@ -430,7 +426,6 @@ class web_dwc2:
 			})
 
 		return repl_
-
 	#	dwc fileinfo - getting gcode info
 	def rr_fileinfo(self, web_):
 
@@ -456,29 +451,45 @@ class web_dwc2:
 		repl_ = self.read_gcode(path_)
 
 		return repl_
-
 	#	dwc rr_gcode - append to gcode_queue
-	def rr_gcode(self, g_):
+	def rr_gcode(self, web_):
 
-		for com_ in str(g_).split("\n"):
-			self.gcode_queue.append(com_)
+		#	handover to klippy as: [ "G28", "M114", "G1 X150", etc... ]
+		gcodes = str( web_.get_argument('gcode') ).split("\n")
 
-		#	special case klipper not ready/shutdown / mcu failure whatever
-		if not self.klipper_ready:
-			basic_allow = [ "M112", "STATUS", "RESTART", "FIRMWARE_RESTART" ]
-			for com_ in self.gcode_queue:
-				command = str( com_.replace("M112","").replace("M999", "FIRMWARE_RESTART") )
-				self.gcode_queue.remove(com_)
+		rrf_commands = {
+			"G10": self.cmd_G10 ,		#	set heaters temp
+			"M0": self.cmd_M0 ,			#	cancel SD print
+			"M32": self.cmd_M32 ,		#	Start sdprint
+			"M98": self.cmd_M98 ,		#	run macro
+			"M106": self.cmd_M106 ,		#	set fan
+			"M290": self.cmd_M290 ,		#	set babysteps
+			"M999": self.cmd_M999		#	issue restart
+		}
 
-				if command in basic_allow:
-					self.gcode.process_commands( [command] )
-				else:
-					self.gcode_reply.append("!! Command >> %s << can not run as klipper is not ready !!" % command )
-					#import pdb; pdb.set_trace()
-			return #{"err": 0}
+		#	tell the webif that we are pending with given number of commands - will it wait for same number of replys ????("seq")
+		web_.write( json.dumps({"buff": len(gcodes), "err": 0}) )
+		web_.finish()
 
-		self.reactor.register_callback(self.gcode_callback)
+		#	start to prepare commands
+		while gcodes:
 
+			#	parse commands - still magic. Wheres the original function in klipper?
+			params = self.parse_params(gcodes.pop(0))
+
+			#	defaulting to original
+			handover = params['#original']
+
+			#	rewrite rrfs specials to klipper readable format
+			if params['#command'] in rrf_commands.keys():
+				func_ = rrf_commands.get(params['#command'])
+				handover = func_(params)
+				if handover == 0:
+					continue
+
+			self.gcode_queue.append(handover)
+
+		self.reactor.register_callback(self.gcode_reactor_callback)
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
 
@@ -496,7 +507,6 @@ class web_dwc2:
 			return {"err": 1}
 
 		return {"err": 0}
-	
 	# 	rr_status_0 if klipper is down/failed to start
 	def rr_status_0(self):
 
@@ -534,7 +544,6 @@ class web_dwc2:
 			"mountedVolumes": 1 ,
 			"name": self.printername
 		})
-
 	#	dwc rr_status 1
 	def rr_status_1(self):
 		now = self.reactor.monotonic()
@@ -613,7 +622,6 @@ class web_dwc2:
 					"current": self.status_1['temps']['current'] + [ chamber_stats.get("temp") ],
 					"state": self.status_1['temps']['state'] + [ chamber_stats.get("state") ] ,
 				})
-
 	#	dwc rr_status 2
 	def rr_status_2(self):
 		now = self.reactor.monotonic()
@@ -735,7 +743,6 @@ class web_dwc2:
 					"current": self.status_2['temps']['current'] + [ chamber_stats.get("temp") ],
 					"state": self.status_2['temps']['state'] + [ chamber_stats.get("state") ] ,
 				})
-
 	#	dwc rr_status 3
 	def rr_status_3(self):
 		#	nested here as its related to fileinfo_3 only
@@ -881,7 +888,6 @@ class web_dwc2:
 					"current": self.status_3['temps']['current'] + [ chamber_stats.get("temp") ],
 					"state": self.status_3['temps']['state'] + [ chamber_stats.get("state") ] ,
 				})
-
 	#	dwc rr_upload - uploading files to sdcard
 	def rr_upload(self, web_):
 
@@ -918,7 +924,6 @@ class web_dwc2:
 		temp = max(self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.))	#	not fully get this - John
 		command_ = str("M104 T%d S%0.2f" % (int(tool)-1,float(temp)))
 		return command_
-
 	#	rrf M0 - cancel print from sd
 	def cmd_M0(self, params):
 
@@ -930,7 +935,6 @@ class web_dwc2:
 
 		#	let user define a cancelprint macro`?
 		return 0
-	
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
@@ -958,7 +962,6 @@ class web_dwc2:
 		}
 
 		return command
-
 	#	rrf run macro
 	def cmd_M98(self, params):
 
@@ -977,7 +980,6 @@ class web_dwc2:
 				lines = f.readlines()
 
 			return [x.strip() for x in lines]
-
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
 
@@ -987,7 +989,6 @@ class web_dwc2:
 			command = str( params['#command'] + " S" + str(int( float(params['S']) * 255 )) )
 
 		return [command]
-
 	#	fo ecxecuting m112 now!
 	def cmd_M112(self, params):
 		
@@ -997,7 +998,6 @@ class web_dwc2:
 			return "FIRMWARE_RESTART"
 		else:
 			self.printer.invoke_shutdown("Emergency Stop from DWC 2")
-
 	#	setting babysteps:
 	def cmd_M290(self, params):
 
@@ -1011,17 +1011,12 @@ class web_dwc2:
 		self.gcode_reply.append("Z adjusted by %0.2f" % mm_step)
 
 		return 0
-
 	#	rrf restart command
 	def cmd_M999(self, params):
 
 		return [ "FIRMWARE_RESTART", "RESTART" ]
-
 	#	getting response by callback
 	def gcode_response(self, msg):
-
-		#	we will parse it later here
-		logging.debug( "DWC2 DEBUG - incomming gcode_reply: " + str( msg ) )
 		
 		if self.klipper_ready:
 			stat_ = self.get_printer_status(0)
@@ -1032,7 +1027,6 @@ class web_dwc2:
 		self.gcode_reply.append(msg)
 
 		#import pdb; pdb.set_trace()
-
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line):
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
@@ -1054,10 +1048,6 @@ class web_dwc2:
 		params['#command'] = cmd = parts[0] + parts[1].strip()
 
 		return params
-
-	#	
-	#	datafetching for dicts mostly taken from Fheilman
-	#
 	#	return status for infoblock parts taken from Fheilmann
 	def get_printer_status(self, now):
 
@@ -1091,7 +1081,6 @@ class web_dwc2:
 			return "B"
 
 		return "I"
-
 	#	import klipper macros as virtual files
 	def get_klipper_macros(self):
 
@@ -1100,107 +1089,7 @@ class web_dwc2:
 			if self.gcode.gcode_help[key_] == "G-Code macro":
 
 				self.klipper_macros.append( key_.upper() )
-
-	#	callback for reactor
-	def gcode_callback(self, eventtime):
-
-		now = self.reactor.monotonic()
-		handover = []
-
-		# cover emergencys just do it now!!
-		if len([ True for s in self.gcode_queue if "M112".lower() in s.lower() ]) > 0:
-			self.cmd_M112("1")
-
-		for com_ in self.gcode_queue :
-
-			command = com_.replace(" \"0:","")
-			params = self.parse_params(command)
-			params['#command'] = params['#command'].split(" ")[0]
-
-			rrf_commands = {
-				"G10": self.cmd_G10 ,		#	set heaters temp
-				"M0": self.cmd_M0 ,			#	cancel SD print
-				"M32": self.cmd_M32 ,		#	Start sdprint
-				"M98": self.cmd_M98 ,		#	run macro
-				"M106": self.cmd_M106 ,		#	set fan
-				"M290": self.cmd_M290 ,		#	set babysteps
-				"M999": self.cmd_M999		#	issue restart
-			}
-
-			#	filter crap and implement em step by step. 
-			supported_gcode = [ 
-				"G0" , "G1", "G10", "G28", "G90", "G91", "M0", "M24", "M25", "M32", "M83", "M98", "M106", "M112", "M114", "M119", "M140", "M141", "M220",
-				"M221", "M290", "M999", "FIRMWARE_RESTART", "QUAD_GANTRY_LEVEL", "RESTART", "STATUS", "T_TILT_ADJUST" ]
-
-			#	midprint ecxecutions directly to klippy
-			mid_print_allow = {
-				"M0": self.cmd_M0 ,								#	cancel SD print
-				"M24": self.sdcard.cmd_M24 ,					#	start or resume sdprint
-				"M25": self.sdcard.cmd_M25 ,					#	Pause SDprint
-				"M106": self.gcode.cmd_M106 ,					#	set fanspeed
-				"M112": self.cmd_M112 ,							#	emergency stop
-				"M114": self.gcode.cmd_M114 ,					#	get actual position
-				"M220": self.gcode.cmd_M220	,					#	set speedfactor
-				"M221": self.gcode.cmd_M221 ,					#	set extrudefactor
-				"M290": self.cmd_M290							#	set Babystep
-			}
-
-			#	handle unsupported commands
-			if params['#command'].upper() not in supported_gcode:
-				if params['#command'].upper() not in self.klipper_macros:
-					self.gcode_reply.append("!! Command >> %s << is not supported !!" % params['#original'])
-					self.gcode_queue.remove(com_)
-					continue
-
-			#	if we are midprint, do it directly to klippers object without gcode_queue 	#	recheck this with new gcode execution
-			if self.get_printer_status(now) == "P":
-				self.gcode_queue.remove(com_)
-				func_ = mid_print_allow.get(params['#command'])
-				if func_:
-					func_(params)
-				else:
-					self.gcode_reply.append("!! Command >> %s << is not allowed during print !!" % params['#command'])
-					self.gcode_queue.remove(com_)
-					continue
-
-			#	handle rrfs specials
-			if params['#command'] in rrf_commands.keys():
-				func_ = rrf_commands.get(params['#command'])
-				command = func_(params)
-				if command == 0:
-					self.gcode_queue.remove(com_)
-					continue
-
-			if type(command) == str:
-				appendors = [c for c in command.split("\n")]
-			elif type(command) == list:
-				appendors = command
-			else:
-				logging.error( "DWC2 - Error in commandtype " + str(type(command)) )
-				self.gcode_queue.remove(com_)
-				continue
-			print(appendors)
-			for c in appendors:
-				handover.append( c )
-
-			self.gcode_queue.remove(com_)
-
-		if handover:
-			if self.gcode.is_processing_data:
-				for com_ in handover:
-					logging.info( "DWC2 - appending gcode to klippy queue: " + com_ )
-					self.gcode_reply.append(">>Gcode over pending_commands>>")
-					self.gcode.pending_commands.append(com_)
-			else:
-				logging.info( "DWC2 - sending gcode: " + json.dumps( handover ) )
-				self.gcode_reply.append(">>Gcode over process_commands>>")
-				self.gcode.is_processing_data = True
-				self.gcode.process_commands( handover )
-				self.gcode.is_processing_data = False
-
-		return
-		#import pdb; pdb.set_trace()
-
+	#	same what gcode.py is doing
 	def get_axes_homed(self):
 
 		kin = self.toolhead.get_kinematics()
@@ -1212,7 +1101,7 @@ class web_dwc2:
 			index = self.gcode.axis2pos[axis]
 			homed.append(0 if kin.limits[index][0] > kin.limits[index][1] else 1)
 		return homed
-
+	#	stats for extruders
 	def get_extr_stats(self, now):
 
 		# position - self.extruders[0].extrude_pos
@@ -1237,7 +1126,7 @@ class web_dwc2:
 
 				extr_stats.append( app_ )
 		return extr_stats
-
+	#	stats for a heatedbed
 	def get_bed_stats(self, now):
 
 		if self.heater_bed is not None:
@@ -1259,7 +1148,7 @@ class web_dwc2:
 				"state": 0
 			}
 		return ret_
-
+	#	read and parse gcode files
 	def read_gcode(self, path_):
 
 		#	looks complicated but should be good maintainable
@@ -1409,7 +1298,29 @@ class web_dwc2:
 
 		self.cached_file_info = repl_
 		return repl_
+	#	recall for gcode ecxecution is needed ( threadsafeness )
+	def gcode_reactor_callback(self, eventtime):
+		#import pdb; pdb.set_trace()
+		ack_needers = [ "G0", "G1", "G28", "M104", "M140", "M141" ]
 
+		while self.gcode_queue:
+
+			params = self.parse_params(self.gcode_queue.pop(0))
+			logging.error( "entering: " + params['#command'] )
+			try:
+				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
+				self.gcode.is_processing_data = True
+				handler(params)
+			except Exception as e:
+				self.gcode_reply.append( "!! " + str(e) )
+				logging.error( "failed: " + params['#command'] + str(e) )
+			else:
+				logging.error( "passed: " + params['#command'] )
+				if params['#command'] in ack_needers:
+					self.gcode_reply.append( "" )	#	pseudo ack
+			finally:
+				self.gcode.is_processing_data = False
+	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
 
 		#	self.dict_compare( self.status_1 , self.status_2 )
