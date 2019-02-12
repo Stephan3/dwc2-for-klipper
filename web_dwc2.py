@@ -80,6 +80,7 @@ class web_dwc2:
 
 		# print data for tracking layers during print
 		self.print_data = {}
+		self.printfile = None
 		self.cached_file_info = None
 		self.klipper_ready = True
 		self.get_klipper_macros()
@@ -375,35 +376,21 @@ class web_dwc2:
 			"files": [] ,
 			"next": 0
 		}
-		if not "/gcodes" in path_:
 
-			#	if rrf is requesting directory, it has to be there.
-			if not os.path.exists(path_):
-				os.makedirs(path_)
+		#	if rrf is requesting directory, it has to be there.
+		if not os.path.exists(path_):
+			os.makedirs(path_)
 
-			#	append elements to files list matching rrf syntax
-			for el_ in os.listdir(path_):
-				el_path = path_ + "/" + el_
-				repl_['files'].append({
-					"type": "d" if os.path.isdir(el_path) else "f" ,
-					"name": str(el_) ,
-					"size": os.stat(el_path).st_size ,
-					"date": datetime.datetime.utcfromtimestamp( os.stat(el_path).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")
-				})
+		#	append elements to files list matching rrf syntax
+		for el_ in os.listdir(path_):
+			el_path = path_ + "/" + el_
+			repl_['files'].append({
+				"type": "d" if os.path.isdir(el_path) else "f" ,
+				"name": str(el_) ,
+				"size": os.stat(el_path).st_size ,
+				"date": datetime.datetime.utcfromtimestamp( os.stat(el_path).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")
+			})
 
-		else:#	klipper does not like subpath on sdcard
-
-			path_ = path_.replace("/gcodes", "")
-			for el_ in os.listdir(path_):
-				el_path = path_ + "/" + el_
-				if os.path.isfile(el_path):
-
-					repl_['files'].append({
-						"type": "f" ,
-						"name": str(el_) ,
-						"size": os.stat(el_path).st_size ,
-						"date": datetime.datetime.utcfromtimestamp( os.stat(el_path).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")
-					})
 		#	add klipper macros as virtual files
 		if "/macros" in web_.get_argument('dir').replace("0:", ""):
 			for macro_ in self.klipper_macros:
@@ -441,10 +428,6 @@ class web_dwc2:
 				self.cached_file_info['printDuration'] = self.toolhead.print_time
 				return self.cached_file_info
 
-		#	klipper hates subpath for sdcardprints.
-		if "/gcodes" in path_:
-			path_ = path_.replace("/gcodes", "")
-
 		if not os.path.isfile(path_):
 			repl_ = { "err": 1 }
 
@@ -455,20 +438,20 @@ class web_dwc2:
 	def rr_gcode(self, web_):
 
 		#	handover to klippy as: [ "G28", "M114", "G1 X150", etc... ]
-		gcodes = str( web_.get_argument('gcode') ).split("\n")
+		gcodes = str( web_.get_argument('gcode') ).replace('0:', '').replace('"', '').split("\n")
 
 		rrf_commands = {
-			"G10": self.cmd_G10 ,		#	set heaters temp
-			"M0": self.cmd_M0 ,			#	cancel SD print
-			"M32": self.cmd_M32 ,		#	Start sdprint
-			"M98": self.cmd_M98 ,		#	run macro
-			"M106": self.cmd_M106 ,		#	set fan
-			"M290": self.cmd_M290 ,		#	set babysteps
-			"M999": self.cmd_M999		#	issue restart
+			'G10': self.cmd_G10 ,		#	set heaters temp
+			'M0': self.cmd_M0 ,			#	cancel SD print
+			'M32': self.cmd_M32 ,		#	Start sdprint
+			'M98': self.cmd_M98 ,		#	run macro
+			'M106': self.cmd_M106 ,		#	set fan
+			'M290': self.cmd_M290 ,		#	set babysteps
+			'M999': self.cmd_M999		#	issue restart
 		}
 
 		#	tell the webif that we are pending with given number of commands - will it wait for same number of replys ????("seq")
-		web_.write( json.dumps({"buff": len(gcodes), "err": 0}) )
+		web_.write( json.dumps({'buff': len(gcodes), 'err': 0}) )
 		web_.finish()
 
 		#	start to prepare commands
@@ -751,8 +734,6 @@ class web_dwc2:
 			#	init print data on started print
 			if not self.print_data:
 
-				lz_ = self.toolhead.get_position()[3]
-
 				self.print_data = {
 					"print_start": time.time() ,
 					"print_dur": 0 ,
@@ -763,7 +744,7 @@ class web_dwc2:
 					"curr_layer_dur" : 0 ,
 					"heat_time": 0 ,
 					"zhop": False ,
-					"last_zposes":	[ lz_ for n_ in range(6) ]#	takes care of zhops
+					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(6) ]
 				}
 
 			self.z_mean = round( sum(self.print_data['last_zposes']) / len(self.print_data['last_zposes']) , 2 )
@@ -771,8 +752,11 @@ class web_dwc2:
 			if self.print_data['curr_layer_start'] == 0 \
 					and self.print_data['extr_start'] < sum(self.toolhead.get_position()[3:]):
 				#	now we know firstlayer started + heating ended(homing?)
-				self.print_data.update({'curr_layer_start': time.time()})
-				self.print_data['heat_time'] = time.time() - self.print_data['print_start']
+				self.print_data.update({
+					'curr_layer_start': time.time() ,
+					'heat_time': time.time() - self.print_data.get('print_start', 0) ,
+					"last_zposes":	[ self.toolhead.get_position()[3] for n_ in range(6) ]
+					})
 
 			if self.z_mean < gcode_stats['last_zpos']:
 				# curr zpos raised
@@ -903,10 +887,6 @@ class web_dwc2:
 		if "/sys/" in path_ and "config.g" in web_.get_argument('name').replace("0:", ""):
 			path_ = self.klipper_config
 
-		#	klipper hates subpath for sdcardprints.
-		if "/gcodes" in path_:
-			path_ = path_.replace("/gcodes", "")
-
 		with open(path_, 'w') as out:
 			out.write(web_.request.body)
 			ret_ = {"err":0}
@@ -931,37 +911,31 @@ class web_dwc2:
 		self.sdcard.file_position = 0			#	reset fileposition
 		self.sdcard.work_timer = None 			#	reset worktimer
 		self.sdcard.current_file = None 		#	
-		#self.sdcard.must_pause_work = False 	#	this is for our ugy getstatus
+		self.printfile = None
 
-		#	let user define a cancelprint macro`?
+		#	let user define a cancel/pause print macro`?
 		return 0
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
-		#	replace the shit with regx - this will fail in its current state someday
-		file = params.get('#original').split("/")[-1].split(" ")[-1].replace("\"", "")
-		command = "M23 " + str(file)
-		command += "\nM24"
-		
-		if not self.cached_file_info:
-			self.cached_file_info = self.read_gcode(self.sdpath + "/" + file)
+		file = "/".join(params['#original'].split('/')[1:])
+		fullpath = self.sdpath + "/" + file
 
-		lz_ = self.toolhead.get_position()[3]
+		#	load a file to scurrent_file if its none
+		if not self.sdcard.current_file:
+			if os.path.isfile(fullpath):
+				self.printfile = open(fullpath, 'rb')				#	get file object as klippy would do
+				self.printfile.seek(0, os.SEEK_END)
+				self.printfile.seek(0)
+				self.sdcard.current_file = self.printfile 			#	set it as current file
+				self.sdcard.file_position = 0 						#	postions / size
+				self.sdcard.file_size = os.stat(fullpath).st_size
+				self.cached_file_info = self.read_gcode(fullpath) 	#	refresh cached file info - its used during printng
+				self.print_data = None 								#	reset printdata as this is a new print
+			else:
+				raise "gcodefile" + fullpath + " not found"
 
-		self.print_data = {
-			"print_start": time.time() ,
-			"print_dur": 0 ,
-			"extr_start": sum(self.toolhead.get_position()[3:]) ,
-			"firstlayer_dur": 0 ,
-			"curr_layer": 1 ,
-			"curr_layer_start": 0 ,
-			"curr_layer_dur" : 0 ,
-			"heat_time": 0 ,
-			"zhop": False ,
-			"last_zposes":	[ lz_ for n_ in range(6) ]#	takes care of zhops
-		}
-
-		return command
+		return "M24"
 	#	rrf run macro
 	def cmd_M98(self, params):
 
@@ -1292,16 +1266,15 @@ class web_dwc2:
 			"printTime": int( meta.get("time_e",1) ) ,			# in seconds
 			"filament": [ float( meta.get("filament",1) ) ] ,		# in mm
 			"generatedBy": str( meta.get("slicer","<<Slicer not implemented>>") ) ,
-			"fileName": path_.split("/")[-1] ,
+			"fileName": '0:' + str(path_).replace(self.sdpath, '') ,
 			"layercount": ( float(meta.get("objects_h",1)) - meta.get("first_h",1) ) / float(meta.get("layer_h",1) ) + 1
 		}
 
-		self.cached_file_info = repl_
 		return repl_
 	#	recall for gcode ecxecution is needed ( threadsafeness )
 	def gcode_reactor_callback(self, eventtime):
 		#import pdb; pdb.set_trace()
-		ack_needers = [ "G0", "G1", "G28", "M104", "M140", "M141" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M104", "M140", "M141" ]
 
 		while self.gcode_queue:
 
@@ -1317,7 +1290,7 @@ class web_dwc2:
 			else:
 				logging.error( "passed: " + params['#command'] )
 				if params['#command'] in ack_needers:
-					self.gcode_reply.append( "" )	#	pseudo ack
+					self.gcode_reply.append( "ack" )	#	pseudo ack
 			finally:
 				self.gcode.is_processing_data = False
 	#	helpful if you mussed something in status 0-3
