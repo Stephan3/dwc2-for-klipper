@@ -750,7 +750,7 @@ class web_dwc2:
 			self.z_mean = round( sum(self.print_data['last_zposes']) / len(self.print_data['last_zposes']) , 2 )
 
 			if self.print_data['curr_layer_start'] == 0 \
-					and self.print_data['extr_start'] < sum(self.toolhead.get_position()[3:]):
+					and self.print_data['extr_start'] + 30 < sum(self.toolhead.get_position()[3:]): 	#	firstlayerdetec min 30mm extrude (skirt?purge?)
 				#	now we know firstlayer started + heating ended(homing?)
 				self.print_data.update({
 					'curr_layer_start': time.time() ,
@@ -1274,7 +1274,7 @@ class web_dwc2:
 	#	recall for gcode ecxecution is needed ( threadsafeness )
 	def gcode_reactor_callback(self, eventtime):
 		#import pdb; pdb.set_trace()
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M104", "M140", "M141" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M104", "M140", "M141" ]
 
 		while self.gcode_queue:
 
