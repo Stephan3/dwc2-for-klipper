@@ -40,6 +40,7 @@ class web_dwc2:
 		self.gcode_queue = []	#	containing gcode user pushes from dwc2
 		self.gcode_reply = []	#	contains the klippy replys
 		self.klipper_macros = []
+		self.gcode.dwc_lock = False
 		self.gcode.register_respond_callback(self.gcode_response) #	if thers a gcode reply, phone me -> see fheilmans its missing in master
 		#	once klipper is ready start pre_flight function - not happy with this. If klipper fails to launch -> no web if?
 		self.printer.register_event_handler("klippy:ready", self.handle_ready)
@@ -1014,7 +1015,7 @@ class web_dwc2:
 		else:
 			command = str( params['#command'] + " S" + str(int( float(params['S']) * 255 )) )
 
-		return [command]
+		return command
 	#	fo ecxecuting m112 now!
 	def cmd_M112(self, params):
 		
@@ -1057,12 +1058,12 @@ class web_dwc2:
 	#	recall for gcode ecxecution is needed ( threadsafeness )
 	def gcode_reactor_callback(self, eventtime):
 		#	if user adds commands return the callback
-		if self.gcode.is_processing_data:
+		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M104", "M140", "M141" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M140", "M141" ]
 
-		self.gcode.is_processing_data = True
+		self.gcode.dwc_lock = self.gcode.is_processing_data = True
 
 		while self.gcode_queue:
 
@@ -1079,7 +1080,7 @@ class web_dwc2:
 				if params['#command'] in ack_needers:
 					self.gcode_reply.append( "ack" )	#	pseudo ack
 
-		self.gcode.is_processing_data = False
+		self.gcode.dwc_lock = self.gcode.is_processing_data = False
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line):
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
@@ -1101,6 +1102,7 @@ class web_dwc2:
 		params['#command'] = cmd = parts[0] + parts[1].strip()
 
 		return params
+
 	#	return status for infoblock parts taken from Fheilmann
 
 ##
