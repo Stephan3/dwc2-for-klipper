@@ -458,7 +458,6 @@ class web_dwc2:
 		#	hits if we are in printing state
 		if web_.get_argument('name', default=None) is not None:
 			path_ = self.sdpath + web_.get_argument('name').replace("0:", "")
-			self.cached_file_info = None
 		else:
 			path_ = self.sdcard.current_file.name
 			if self.cached_file_info is not None:
@@ -469,7 +468,6 @@ class web_dwc2:
 			repl_ = { "err": 1 }
 
 		repl_ = self.read_gcode(path_)
-		self.cached_file_info = None
 		return repl_
 	#	dwc rr_gcode - append to gcode_queue
 	def rr_gcode(self, web_):
@@ -595,7 +593,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed'] / 3600 ,
+				"requested": gcode_stats['speed'] / 60 ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1,	#	must be at least 1 ! learned the hardway....
@@ -674,7 +672,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed'] / 3600 ,
+				"requested": gcode_stats['speed'] / 60 ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
@@ -799,7 +797,7 @@ class web_dwc2:
 
 			if self.print_data['curr_layer_start'] == 0 \
 					and self.print_data['extr_start'] + 80 < sum(self.toolhead.get_position()[3:]): 	#	firstlayerdetec min 80mm extrude (skirt?purge?)
-				#	now we know firstlayer started + heating ended(homing?)
+				#	now we know firstlayer started + heating ended
 				self.print_data.update({
 					'curr_layer_start': time.time() ,
 					'heat_time': time.time() - self.print_data.get('print_start', 0) ,
@@ -852,7 +850,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed'] / 3600 ,
+				"requested": gcode_stats['speed'] / 60 ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
@@ -891,20 +889,20 @@ class web_dwc2:
 				]
 			},
 			"time": time.time() - self.start_time,
-			"currentLayer": self.print_data['curr_layer'] ,
-			"currentLayerTime": self.print_data['curr_layer_dur'],
-			"extrRaw": [ sum([ ex_['pos'] for ex_ in extr_stat ]) - self.print_data['extr_start'] ],
+			"currentLayer": self.print_data.get('curr_layer', 1) ,
+			"currentLayerTime": self.print_data.get('curr_layer_dur', 1),
+			"extrRaw": [ sum([ ex_['pos'] for ex_ in extr_stat ]) - self.print_data.get('extr_start', 1) ],
 			"fractionPrinted": self.sdcard.get_status(now).get('progress', 0) , # percent done
 			"filePosition": self.sdcard.file_position,
-			"firstLayerDuration": self.print_data['firstlayer_dur'] if self.print_data['firstlayer_dur'] > 0 else self.print_data['curr_layer_dur'],
-			"firstLayerHeight": self.cached_file_info['firstLayerHeight'],
-			"printDuration": self.print_data['print_dur'] ,
-			"warmUpDuration": self.print_data['heat_time'],
+			"firstLayerDuration": self.print_data.get('firstlayer_dur', 1) if self.print_data.get('firstlayer_dur', 0) > 0 else self.print_data.get('curr_layer_dur', 1),
+			"firstLayerHeight": self.cached_file_info.get('firstLayerHeight', 0.2),
+			"printDuration": self.print_data.get('print_dur', 1) ,
+			"warmUpDuration": self.print_data.get('heat_time', 1),
 			"timesLeft": {
-				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.cached_file_info['printTime'],
-				"filament": (1-( sum(self.toolhead.get_position()[3:]) - self.print_data["extr_start"] ) \
-								/ sum(self.cached_file_info["filament"]) ) * self.cached_file_info['printTime'],
-				"layer": (1-self.print_data['curr_layer'] / self.cached_file_info['layercount']) * self.cached_file_info['printTime']
+				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.cached_file_info.get('printTime', 1),
+				"filament": (1-( sum(self.toolhead.get_position()[3:]) - self.print_data.get("extr_start", 1) ) \
+								/ sum(self.cached_file_info.get( "filament", 1) ) ) * self.cached_file_info.get('printTime', 1),
+				"layer": (1-self.print_data.get('curr_layer', 1) / self.cached_file_info.get('layercount', 1) ) * self.cached_file_info.get('printTime', 1)
 			}
 		})
 
@@ -1081,8 +1079,8 @@ class web_dwc2:
 				self.gcode_reply.append( "!! " + str(e) + "\n" )
 			else:
 				logging.error( "passed: " + params['#command'] )
-				if params['#command'] in ack_needers:
-					self.gcode_reply.append( "ack" )	#	pseudo ack
+				if params['#command'] in ack_needers or params['#command'] in self.klipper_macros:
+					self.gcode_reply.append( "" )	#	pseudo ack
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = False
 	#	parses gcode commands into params -took from johns work
