@@ -595,7 +595,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed']	/ 60 ,
+				"requested": gcode_stats['speed'] / 3600 ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1,	#	must be at least 1 ! learned the hardway....
@@ -674,7 +674,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed']	/ 60 ,
+				"requested": gcode_stats['speed'] / 3600 ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
@@ -852,7 +852,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed']	/ 60 ,
+				"requested": gcode_stats['speed'] / 3600 ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
@@ -878,7 +878,7 @@ class web_dwc2:
 				},
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
-				"names": [ "", "", "", "", "", "", "", "" ],
+				"names": [ "Bed" ] + [ ex_['name'] for ex_ in extr_stat ],
 				"tools": {
 					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
 					"standby": [ [ 0 ] for ex_ in extr_stat ]
@@ -919,7 +919,7 @@ class web_dwc2:
 					},
 					"current": self.status_3['temps']['current'] + [ chamber_stats.get("temp") ],
 					"state": self.status_3['temps']['state'] + [ chamber_stats.get("state") ] ,
-					"names": self.status_2['temps']['names'] + [ "Chamber" ]
+					"names": self.status_3['temps']['names'] + [ "Chamber" ]
 				})
 	#	dwc rr_upload - uploading files to sdcard
 	def rr_upload(self, web_):
@@ -969,11 +969,14 @@ class web_dwc2:
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
+		#	file dwc1 - 'zzz/simplify3D41.gcode'
+		#	file dwc2 - '/gcodes/zzz/simplify3D41.gcode'
+
 		file = '/'.join(params['#original'].split(' ')[1:])
-		if 'gcodes' not in file:	#	DWC 1 work arround
+		if '/gcodes/' not in file:	#	DWC 1 work arround
 			fullpath = self.sdpath + '/gcodes/' + params['#original'].split()[1]
 		else:
-			fullpath = self.sdpath + '/' + file
+			fullpath = self.sdpath + file
 
 		#	load a file to scurrent_file if its none
 		if not self.sdcard.current_file:
@@ -1153,17 +1156,17 @@ class web_dwc2:
 				self.klipper_macros.append( key_.upper() )
 	#	same what gcode.py is doing
 	def get_axes_homed(self):
-
-		kin = self.toolhead.get_kinematics()
-
-		if not kin.limits:
-			return [ 0.,0.,0. ]
+		#	self.toolhead.get_next_move_time() - self.reactor.monotonic()
 		homed = []
-		for axis in 'XYZ':
-			index = self.gcode.axis2pos[axis]
-			homed.append(0 if kin.limits[index][0] > kin.limits[index][1] else 1)
-		return homed
+		for rail in self.kinematics.rails:
 
+			if rail.is_motor_enabled():
+				homed.append(1)
+			else:
+				homed.append(0)
+		if not homed:
+			homed = [0,0,0]
+		return homed
 	#	stats for extruders
 	def get_extr_stats(self, now):
 
