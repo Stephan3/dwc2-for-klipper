@@ -543,7 +543,7 @@ class web_dwc2:
 		#	just put in things really needed to make dwc2 happy
 
 		self.status_0.update({
-			"status": self.get_printer_status(0),
+			"status": self.get_printer_status(),
 			"seq": len(self.gcode_reply),
 			"coords": {
 				"xyz": [] ,
@@ -587,7 +587,7 @@ class web_dwc2:
 			fan_stats = []
 
 		self.status_1.update({
-			"status": self.get_printer_status(now),
+			"status": self.get_printer_status(),
 			"coords": {
 				"axesHomed": self.get_axes_homed(),
 				"xyz": self.toolhead.get_position()[:3] ,
@@ -666,7 +666,7 @@ class web_dwc2:
 
 		#	dummy data
 		self.status_2.update({
-			"status": self.get_printer_status(now) ,
+			"status": self.get_printer_status() ,
 			"coords": {
 				"axesHomed": self.get_axes_homed() ,
 				"xyz": self.toolhead.get_position()[:3] ,
@@ -844,7 +844,7 @@ class web_dwc2:
 		manage_print_data()
 
 		self.status_3.update({
-			"status": self.get_printer_status(now) ,
+			"status": self.get_printer_status() ,
 			"coords": {
 				"axesHomed": self.get_axes_homed() ,
 				"xyz": self.toolhead.get_position()[:3] ,
@@ -1023,37 +1023,31 @@ class web_dwc2:
 		return command
 	#	fo ecxecuting m112 now!
 	def cmd_M112(self, params):
-		
-		if self.get_printer_status(0) == "O":
-			#	if its dead allready isse a firmware_restart
-			self.printer.invoke_shutdown("Emergency Stop from DWC 2")
-			return "FIRMWARE_RESTART"
-		else:
-			self.printer.invoke_shutdown("Emergency Stop from DWC 2")
+		self.printer.invoke_shutdown('Emergency Stop from DWC 2')
 	#	setting babysteps:
 	def cmd_M290(self, params):
 
 		if self.get_axes_homed()[2] == 0:
-			self.gcode_reply.append("!! Only idiots try to babystep withoung homing !!")
+			self.gcode_reply.append('!! Only idiots try to babystep withoung homing !!')
 			return 0
 
 		mm_step = self.gcode.get_float('Z', params, None)
 		if not mm_step: mm_step = self.gcode.get_float('S', params, None)	#	DWC 1 workarround
-		params = self.parse_params("SET_GCODE_OFFSET Z_ADJUST%0.2f" % mm_step)
+		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST%0.2f' % mm_step)
 		self.gcode.cmd_SET_GCODE_OFFSET(params)
-		self.gcode_reply.append("Z adjusted by %0.2f" % mm_step)
+		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
 
 		return 0
 	#	rrf restart command
 	def cmd_M999(self, params):
-
-		return [ "FIRMWARE_RESTART", "RESTART" ]
+		#needs0 otherwise the printer gets restarted after emergency buttn is pressed
+		return 0
 	#	getting response by callback
 	def gcode_response(self, msg):
 		
 		if self.klipper_ready:
-			stat_ = self.get_printer_status(0)
-			if stat_ in [ "S", "P", "D" ]:
+			stat_ = self.get_printer_status()
+			if stat_ in [ 'S', 'P', 'D' ]:
 				#SPD? seriously? printing state
 				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
 
@@ -1066,7 +1060,7 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M140", "M141" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
 
@@ -1114,7 +1108,7 @@ class web_dwc2:
 #	Helper functions getting/parsing data
 ##
 
-	def get_printer_status(self, now):
+	def get_printer_status(self):
 
 		#	case 'F': return 'updating';
 		#	case 'O': return 'off';
@@ -1132,17 +1126,13 @@ class web_dwc2:
 			self.klipper_ready = False
 			return "O"
 
-		if self.sdcard.current_file is not None:
+		if self.sdcard.current_file:
 			if self.sdcard.must_pause_work:
-				# D = pausing, A = paused
-				return "D" if self.sdcard.work_timer is not None else "S"	#	A was not pause
-			if self.sdcard.current_file is not None and self.sdcard.work_timer is not None:
-				# Printing
+				return "D" if self.sdcard.work_timer else "S"
+			if self.sdcard.current_file and self.sdcard.work_timer:
 				return "P"
 
-		#if self.gcode.get_status(now)['busy']:
 		if self.gcode.is_processing_data:
-			# B = busy
 			return "B"
 
 		return "I"
