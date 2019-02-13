@@ -595,8 +595,8 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": 0,
-				"top": gcode_stats['speed']	/ 60	#	not ecxatly the same but comes close
+				"requested": gcode_stats['speed']	/ 60 ,
+				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1,	#	must be at least 1 ! learned the hardway....
 			"params": {
@@ -674,8 +674,8 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": 0 ,
-				"top": gcode_stats['speed']	/ 60	#	not ecxatly the same but comes close
+				"requested": gcode_stats['speed']	/ 60 ,
+				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
 			"params": {
@@ -706,7 +706,7 @@ class web_dwc2:
 				#},
 				"current": [ bed_stats['actual'] ] + [ ex_['actual'] for ex_ in extr_stat ] ,
 				"state": [ bed_stats['state'] ] + [ ex_['state'] for ex_ in extr_stat ] ,
-				"names": [ "", "", "", "", "", "", "", "" ],
+				"names": [ "Bed" ] + [ ex_['name'] for ex_ in extr_stat ] ,
 				"tools": {
 					"active": [ [ ex_['target'] ] for ex_ in extr_stat ],
 					"standby": [ [ 0 ] for ex_ in extr_stat ]
@@ -741,9 +741,9 @@ class web_dwc2:
 			"tools": [
 				{
 					"number": extr_stat.index(ex_) + 1 ,
-					"name": "",
+					"name": ex_['name'] ,
 					"heaters": [ extr_stat.index(ex_) + 1 ],
-					"drives": [	extr_stat.index(ex_) ] ,
+					"drives": [ extr_stat.index(ex_) + 1 ] ,
 					"axisMap": [ 1 ],
 					"fans": 1,
 					"filament": "",
@@ -772,6 +772,7 @@ class web_dwc2:
 					},
 					"current": self.status_2['temps']['current'] + [ chamber_stats.get("temp") ],
 					"state": self.status_2['temps']['state'] + [ chamber_stats.get("state") ] ,
+					"names": self.status_2['temps']['names'] + [ "Chamber" ]
 				})
 	#	dwc rr_status 3
 	def rr_status_3(self):
@@ -851,8 +852,8 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": 0 ,
-				"top": gcode_stats['speed'] /60	#	not ecxatly the same but comes close
+				"requested": gcode_stats['speed']	/ 60 ,
+				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
 			"params": {
@@ -918,6 +919,7 @@ class web_dwc2:
 					},
 					"current": self.status_3['temps']['current'] + [ chamber_stats.get("temp") ],
 					"state": self.status_3['temps']['state'] + [ chamber_stats.get("state") ] ,
+					"names": self.status_2['temps']['names'] + [ "Chamber" ]
 				})
 	#	dwc rr_upload - uploading files to sdcard
 	def rr_upload(self, web_):
@@ -1161,6 +1163,7 @@ class web_dwc2:
 			index = self.gcode.axis2pos[axis]
 			homed.append(0 if kin.limits[index][0] > kin.limits[index][1] else 1)
 		return homed
+
 	#	stats for extruders
 	def get_extr_stats(self, now):
 
@@ -1176,6 +1179,7 @@ class web_dwc2:
 				status = ex_.heater.get_status(now)
 
 				app_ = {
+					'name': re.sub('\d', '', ex_.name) + str( self.extruders.index(ex_) ) ,
 					'pos': ex_.extrude_pos ,
 					'actual': status['temperature'] ,
 					'target': status['target'] ,
@@ -1201,7 +1205,6 @@ class web_dwc2:
 				"state": 0 if status['target'] < 20 else 2
 			}
 		else:
-
 			ret_ = {
 				"actual": 0 ,
 				"target": 0 ,
