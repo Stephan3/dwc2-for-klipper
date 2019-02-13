@@ -469,7 +469,7 @@ class web_dwc2:
 			repl_ = { "err": 1 }
 
 		repl_ = self.read_gcode(path_)
-
+		self.cached_file_info = None
 		return repl_
 	#	dwc rr_gcode - append to gcode_queue
 	def rr_gcode(self, web_):
@@ -798,7 +798,7 @@ class web_dwc2:
 			self.z_mean = round( sum(self.print_data['last_zposes']) / len(self.print_data['last_zposes']) , 2 )
 
 			if self.print_data['curr_layer_start'] == 0 \
-					and self.print_data['extr_start'] + 30 < sum(self.toolhead.get_position()[3:]): 	#	firstlayerdetec min 30mm extrude (skirt?purge?)
+					and self.print_data['extr_start'] + 80 < sum(self.toolhead.get_position()[3:]): 	#	firstlayerdetec min 80mm extrude (skirt?purge?)
 				#	now we know firstlayer started + heating ended(homing?)
 				self.print_data.update({
 					'curr_layer_start': time.time() ,
@@ -997,7 +997,7 @@ class web_dwc2:
 	#	rrf run macro
 	def cmd_M98(self, params):
 
-		path = self.sdpath + "/" + params['#original'].split(" ")[1].replace("P\"0:/", "").replace("\"", "")
+		path = self.sdpath + "/" + "/".join(params['#original'].split("/")[1:])
 
 		if not os.path.exists(path):
 			#	now we know its no macro file
@@ -1011,7 +1011,10 @@ class web_dwc2:
 			with open( path ) as f:
 				lines = f.readlines()
 
-			return [x.strip() for x in lines]
+			for line in [x.strip() for x in lines]:
+				self.gcode_queue.append(line)
+
+			return 0
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
 
@@ -1072,8 +1075,10 @@ class web_dwc2:
 				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
 				handler(params)
 			except Exception as e:
-				self.gcode_reply.append( "!! " + str(e) )
+				self.gcode_reply.append( "" )
 				logging.error( "failed: " + params['#command'] + str(e) )
+				time.sleep(1)	#	not beautiful but webif ignores errors on button commands otherwise
+				self.gcode_reply.append( "!! " + str(e) + "\n" )
 			else:
 				logging.error( "passed: " + params['#command'] )
 				if params['#command'] in ack_needers:
