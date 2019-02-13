@@ -486,8 +486,13 @@ class web_dwc2:
 		}
 
 		#	tell the webif that we are pending with given number of commands - will it wait for same number of replys ????("seq")
-		web_.write( json.dumps({'buff': len(gcodes), 'err': 0}) )
+		web_.write( json.dumps({'buff': 1, 'err': 0}) )
 		web_.finish()
+
+		#	Handle emergencys - just do it now
+		for code in gcodes:
+			if 'M112' in code:
+				self.cmd_M112(0)
 
 		#	start to prepare commands
 		while gcodes:
@@ -574,7 +579,7 @@ class web_dwc2:
 		})
 	#	dwc rr_status 1
 	def rr_status_1(self):
-		now = self.reactor.monotonic()
+		now = self.reactor.monotonic() + 0.25
 
 		extr_stat = self.get_extr_stats(now)
 		bed_stats = self.get_bed_stats(now)
@@ -652,7 +657,7 @@ class web_dwc2:
 				})
 	#	dwc rr_status 2
 	def rr_status_2(self):
-		now = self.reactor.monotonic()
+		now = self.reactor.monotonic() + 0.25
 
 		extr_stat = self.get_extr_stats(now)
 		bed_stats = self.get_bed_stats(now)
@@ -810,6 +815,7 @@ class web_dwc2:
 			elif self.z_mean > gcode_stats['last_zpos']:
 				# curr zpos is now lower as history mean so it was a travel zhop
 				self.print_data['zhop'] = False
+
 			if self.z_mean == gcode_stats['last_zpos'] \
 					and self.print_data['zhop']:
 				self.print_data['zhop'] = False
@@ -828,7 +834,7 @@ class web_dwc2:
 			self.print_data['last_zposes'].append(gcode_stats['last_zpos'])
 			self.print_data['print_dur'] = time.time() - self.print_data['print_start']
 
-		now = self.reactor.monotonic()
+		now = self.reactor.monotonic() + 0.25
 
 		self.extr_stat = self.get_extr_stats(now)
 		extr_stat = self.extr_stat
@@ -934,7 +940,7 @@ class web_dwc2:
 		if "/sys/" in path_ and "config.g" in web_.get_argument('name').replace("0:", ""):
 			path_ = self.klipper_config
 
-		with open(path_, 'w') as out:
+		with open(path_.replace(" ","_"), 'w') as out:
 			out.write(web_.request.body)
 
 		if os.path.isfile(path_):
@@ -1295,6 +1301,7 @@ class web_dwc2:
 		pile = " ".join(int_)					#	build a big pile for regex
 		#	determine slicer
 		sl = -1
+
 		for regex in slicers:
 			#	resource gunner ?
 			if re.compile(regex).search(pile):
@@ -1357,7 +1364,6 @@ class web_dwc2:
 		}
 
 		return repl_
-
 
 	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
