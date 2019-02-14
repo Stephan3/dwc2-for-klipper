@@ -508,6 +508,7 @@ class web_dwc2:
 				func_ = rrf_commands.get(params['#command'])
 				handover = func_(params)
 				if handover == 0:
+					self.gcode_reply.append("ok\n")
 					continue
 
 			self.gcode_queue.append(handover)
