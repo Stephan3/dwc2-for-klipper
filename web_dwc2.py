@@ -134,7 +134,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		#dbg.start()
+		dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
 
@@ -219,7 +219,7 @@ class web_dwc2:
 			#	gcode reply
 			elif "rr_reply" in self.request.uri:
 				while self.web_dwc2.gcode_reply:
-					msg = self.web_dwc2.gcode_reply.pop(0).replace("!!", "Error: ")
+					msg = self.web_dwc2.gcode_reply.pop(0).replace("!!", "Error: ").replace("//", "Warning: ")
 					self.write( msg )
 				return
 
@@ -486,7 +486,7 @@ class web_dwc2:
 		}
 
 		#	tell the webif that we are pending with given number of commands - will it wait for same number of replys ????("seq")
-		web_.write( json.dumps({'buff': 1, 'err': 0}) )
+		web_.write( json.dumps({'buff': 0, 'err': 0}) )
 		web_.finish()
 
 		#	Handle emergencys - just do it now
@@ -599,7 +599,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed'] / 60 ,
+				"requested": gcode_stats['speed'] / 60 * gcode_stats['speed_factor'] ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1,	#	must be at least 1 ! learned the hardway....
@@ -678,7 +678,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed'] / 60 ,
+				"requested": gcode_stats['speed'] / 60 * gcode_stats['speed_factor'] ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
@@ -796,43 +796,37 @@ class web_dwc2:
 					"curr_layer_dur" : 0 ,
 					"heat_time": 0 ,
 					"zhop": False ,
-					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(6) ]
+					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(30) ] ,
+					"last_switch_z": 0,
 				}
-
-			self.z_mean = round( sum(self.print_data['last_zposes']) / len(self.print_data['last_zposes']) , 2 )
-
-			if self.print_data['curr_layer_start'] == 0 \
-					and self.print_data['extr_start'] + 80 < sum(self.toolhead.get_position()[3:]): 	#	firstlayerdetec min 80mm extrude (skirt?purge?)
-				#	now we know firstlayer started + heating ended
-				self.print_data.update({
-					'curr_layer_start': time.time() ,
-					'heat_time': time.time() - self.print_data.get('print_start', 0) ,
-					"last_zposes":	[ self.toolhead.get_position()[3] for n_ in range(6) ]
-					})
-
-			if self.z_mean < gcode_stats['last_zpos']:
-				# curr zpos raised
-				self.print_data['zhop'] = True
-			elif self.z_mean > gcode_stats['last_zpos']:
-				# curr zpos is now lower as history mean so it was a travel zhop
-				self.print_data['zhop'] = False
-
-			if self.z_mean == gcode_stats['last_zpos'] \
-					and self.print_data['zhop']:
-				self.print_data['zhop'] = False
-				#
-				if self.print_data['firstlayer_dur'] == 0:
-					self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
-				self.print_data['curr_layer_start'] = time.time()
-				self.print_data['curr_layer'] += 1
-				self.print_data['curr_layer_dur'] = 0
-
-			if self.print_data['curr_layer_start'] != 0:
-				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
 
 			#	first out, actual in - a rolling list
 			self.print_data['last_zposes'].pop(0)
 			self.print_data['last_zposes'].append(gcode_stats['last_zpos'])
+			filament_used = self.print_data['extr_start'] - sum(self.toolhead.get_position()[3:])
+
+			if self.print_data['curr_layer_start'] == 0 \
+					and filament_used > 50:
+				#	now we know firstlayer started + heating ended
+				self.print_data.update({
+					'curr_layer_start': time.time() ,
+					'heat_time': time.time() - self.print_data.get('print_start', 0)
+					})
+
+			else:
+				if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and filament_used > 50 \
+						and max( self.print_data.get('last_zposes') ) / min( self.print_data.get('last_zposes') ) == 1 :
+					print( "layerswitch to: " + str(self.print_data['curr_layer']+1) + " zmean: " + str(z_mean) + " last_z: " + str(gcode_stats['last_zpos']) + " zhistory: " + str(self.print_data['last_zposes']) )
+					if self.print_data['firstlayer_dur'] == 0:
+						self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
+					self.print_data.update({
+						'curr_layer_start': time.time() ,
+						'curr_layer_dur': 0 ,
+						'curr_layer': self.print_data['curr_layer'] + 1 ,
+						'last_switch_z': gcode_stats['last_zpos']
+						})
+				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
+
 			self.print_data['print_dur'] = time.time() - self.print_data['print_start']
 
 		now = self.reactor.monotonic() + 0.25
@@ -857,7 +851,7 @@ class web_dwc2:
 				"extr": self.toolhead.get_position()[3:]
 			},
 			"speeds": {
-				"requested": gcode_stats['speed'] / 60 ,
+				"requested": gcode_stats['speed'] / 60 * gcode_stats['speed_factor'] ,
 				"top": 	0 #	not available on klipepr
 			},
 			"currentTool": 1 ,
@@ -938,7 +932,7 @@ class web_dwc2:
 			os.makedirs(dir_)
 
 		#	klipper config ecxeption
-		if "/sys/" in path_ and "config.g" in web_.get_argument('name').replace("0:", ""):
+		if "/sys/" in path_ and "config.g" in web_.get_argument('name'):
 			path_ = self.klipper_config
 
 		with open(path_.replace(" ","_"), 'w') as out:
@@ -1358,7 +1352,7 @@ class web_dwc2:
 			"layerHeight": float( meta.get("layer_h",1) ) ,
 			"printTime": int( meta.get("time_e",1) ) ,			# in seconds
 			"filament": [ float( meta.get("filament",1) ) ] ,		# in mm
-			"generatedBy": str( meta.get("slicer","<<Slicer not implemented>>") ) ,
+			"generatedBy": str( meta.get("slicer","<< Slicer not implemented >>") ) ,
 			"fileName": '0:' + str(path_).replace(self.sdpath, '') ,
 			"layercount": ( float(meta.get("objects_h",1)) - meta.get("first_h",1) ) / float(meta.get("layer_h",1) ) + 1 ,
 			"err": 0
