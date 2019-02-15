@@ -466,7 +466,7 @@ class web_dwc2:
 
 		if not os.path.isfile(path_):
 			repl_ = { "err": 1 }
-
+		self._reactor.pause(self._reactor.monotonic() + 1.000)
 		repl_ = self.read_gcode(path_)
 		return repl_
 	#	dwc rr_gcode - append to gcode_queue
@@ -796,14 +796,14 @@ class web_dwc2:
 					"curr_layer_dur" : 0 ,
 					"heat_time": 0 ,
 					"zhop": False ,
-					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(30) ] ,
+					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(10) ] ,
 					"last_switch_z": 0,
 				}
 
 			#	first out, actual in - a rolling list
 			self.print_data['last_zposes'].pop(0)
 			self.print_data['last_zposes'].append(gcode_stats['last_zpos'])
-			filament_used = self.print_data['extr_start'] - sum(self.toolhead.get_position()[3:])
+			filament_used = sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start']
 
 			if self.print_data['curr_layer_start'] == 0 \
 					and filament_used > 50:
@@ -816,13 +816,13 @@ class web_dwc2:
 			else:
 				if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and filament_used > 50 \
 						and max( self.print_data.get('last_zposes') ) / min( self.print_data.get('last_zposes') ) == 1 :
-					print( "layerswitch to: " + str(self.print_data['curr_layer']+1) + " zmean: " + str(z_mean) + " last_z: " + str(gcode_stats['last_zpos']) + " zhistory: " + str(self.print_data['last_zposes']) )
+					print( "layerswitch to: " + str(self.print_data['curr_layer']+1) + " last_z: " + str(gcode_stats['last_zpos']) + " zhistory: " + str(self.print_data['last_zposes']) )
 					if self.print_data['firstlayer_dur'] == 0:
 						self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
 					self.print_data.update({
 						'curr_layer_start': time.time() ,
 						'curr_layer_dur': 0 ,
-						'curr_layer': self.print_data['curr_layer'] + 1 ,
+						'curr_layer': self.print_data['curr_layer'] + 1 if self.print_data['last_switch_z'] > 0 else 1 ,
 						'last_switch_z': gcode_stats['last_zpos']
 						})
 				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
