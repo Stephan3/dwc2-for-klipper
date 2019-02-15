@@ -319,7 +319,7 @@ class web_dwc2:
 			"dwsVersion": self.printer.get_start_args()['software_version'],
 			"firmwareDate": "2018-12-24b1",	#	didnt get that from klippy
 			"idleCurrentFactor": 35,
-			"idleTimeout": 5,
+			"idleTimeout": 10,
 			"minFeedrates": [ 5 for x in ax_[0] ] + [ 5 for ex_ in extru_ if ex_ is not None ] ,
 			"maxFeedrates": [ max_vel for x in ax_[0] ] + [ min(75,max_vel) for ex_ in extru_ if ex_ is not None ]	#	unitconversion ?
 		}
@@ -466,7 +466,7 @@ class web_dwc2:
 
 		if not os.path.isfile(path_):
 			repl_ = { "err": 1 }
-		self._reactor.pause(self._reactor.monotonic() + 1.000)
+
 		repl_ = self.read_gcode(path_)
 		return repl_
 	#	dwc rr_gcode - append to gcode_queue
@@ -810,7 +810,8 @@ class web_dwc2:
 				#	now we know firstlayer started + heating ended
 				self.print_data.update({
 					'curr_layer_start': time.time() ,
-					'heat_time': time.time() - self.print_data.get('print_start', 0)
+					'heat_time': time.time() - self.print_data.get('print_start', 0) ,
+					'last_switch_z': gcode_stats['last_zpos']
 					})
 
 			else:
@@ -822,7 +823,7 @@ class web_dwc2:
 					self.print_data.update({
 						'curr_layer_start': time.time() ,
 						'curr_layer_dur': 0 ,
-						'curr_layer': self.print_data['curr_layer'] + 1 if self.print_data['last_switch_z'] > 0 else 1 ,
+						'curr_layer': self.print_data['curr_layer'] + 1 ,
 						'last_switch_z': gcode_stats['last_zpos']
 						})
 				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
