@@ -85,9 +85,8 @@ class web_dwc2:
 		self.kinematics = self.toolhead.get_kinematics()
 
 		# print data for tracking layers during print
-		self.print_data = {}
-		self.printfile = None
-		self.cached_file_info = None
+		self.print_data = {}			#	printdata/layertimes etc
+		self.file_infos = {}			#	just read files once
 		self.klipper_ready = True
 		self.get_klipper_macros()
 	#	reactor calls this on klippy restart
@@ -104,7 +103,7 @@ class web_dwc2:
 	def dwc2(self):
 		def tornado_logger(req):
 			fressehaltn = []
-			#fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply" ]
+			fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply" ]
 			values = [str(time.time())[-8:], req.request.remote_ip, req.request.method, req.request.uri]
 			if req.request.uri not in fressehaltn:
 				logging.info("DWC2:" + " - ".join(values))	#	bind this to debug later
@@ -135,7 +134,7 @@ class web_dwc2:
 		self.tornado.start()
 
 		dbg = threading.Thread( target=debug_console, args=(self,) )
-		dbg.start()
+		#dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
 
@@ -172,7 +171,6 @@ class web_dwc2:
 			self.web_dwc2 = web_dwc2
 			self.repl_ = {"err":1}
 
-		@tornado.web.asynchronous
 		@tornado.gen.coroutine
 		def get(self, *args):
 
@@ -322,8 +320,8 @@ class web_dwc2:
 			"firmwareVersion": self.printer.get_start_args()['software_version'],
 			"dwsVersion": self.printer.get_start_args()['software_version'],
 			"firmwareDate": "2018-12-24b1",	#	didnt get that from klippy
-			"idleCurrentFactor": 35,
-			"idleTimeout": 10,
+			"idleCurrentFactor": 30,
+			"idleTimeout": 30,
 			"minFeedrates": [ 5 for x in ax_[0] ] + [ 5 for ex_ in extru_ if ex_ is not None ] ,
 			"maxFeedrates": [ max_vel for x in ax_[0] ] + [ min(75,max_vel) for ex_ in extru_ if ex_ is not None ]	#	unitconversion ?
 		}
@@ -340,6 +338,9 @@ class web_dwc2:
 
 		if os.path.isfile(path_):
 			os.remove(path_)
+
+		if path_ in self.file_infos.keys():
+			self.file_infos.pop(path_, None)
 
 		return {'err': 0}
 	#	dwc rr_download - lacks logging
@@ -464,15 +465,16 @@ class web_dwc2:
 			path_ = self.sdpath + web_.get_argument('name').replace("0:", "")
 		else:
 			path_ = self.sdcard.current_file.name
-			if self.cached_file_info is not None:
-				self.cached_file_info['printDuration'] = self.toolhead.print_time
-				return self.cached_file_info
 
 		if not os.path.isfile(path_):
 			repl_ = { "err": 1 }
 
-		repl_ = self.read_gcode(path_)
-		return repl_
+		if not path_ in self.file_infos.keys():
+			self.file_infos['running_file'] = self.file_infos[path_] = self.read_gcode(path_)
+		else:
+			self.file_infos['running_file'] = self.file_infos[path_]
+
+		return self.file_infos[path_]
 	#	dwc rr_gcode - append to gcode_queue
 	def rr_gcode(self, web_):
 
@@ -829,7 +831,7 @@ class web_dwc2:
 						'curr_layer': self.print_data['curr_layer'] + 1 ,
 						'last_switch_z': gcode_stats['last_zpos']
 						})
-				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
+					self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
 
 			self.print_data['print_dur'] = time.time() - self.print_data['print_start']
 
@@ -900,14 +902,14 @@ class web_dwc2:
 			"fractionPrinted": self.sdcard.get_status(now).get('progress', 0) , # percent done
 			"filePosition": self.sdcard.file_position,
 			"firstLayerDuration": self.print_data.get('firstlayer_dur', 1) if self.print_data.get('firstlayer_dur', 0) > 0 else self.print_data.get('curr_layer_dur', 1),
-			"firstLayerHeight": self.cached_file_info.get('firstLayerHeight', 0.2),
+			"firstLayerHeight": self.file_infos['running_file'].get('firstLayerHeight', 0.2),
 			"printDuration": self.print_data.get('print_dur', 1) ,
 			"warmUpDuration": self.print_data.get('heat_time', 1),
 			"timesLeft": {
-				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.cached_file_info.get('printTime', 1),
+				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.file_infos['running_file'].get('printTime', 1),
 				"filament": (1-( sum(self.toolhead.get_position()[3:]) - self.print_data.get("extr_start", 1) ) \
-								/ sum(self.cached_file_info.get( "filament", 1) ) ) * self.cached_file_info.get('printTime', 1),
-				"layer": (1-self.print_data.get('curr_layer', 1) / self.cached_file_info.get('layercount', 1) ) * self.cached_file_info.get('printTime', 1)
+								/ sum(self.file_infos['running_file'].get( "filament", 1) ) ) * self.file_infos['running_file'].get('printTime', 1),
+				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos['running_file'].get('layercount', 1) ) * self.file_infos['running_file'].get('printTime', 1)
 			}
 		})
 
@@ -984,14 +986,13 @@ class web_dwc2:
 		#	load a file to scurrent_file if its none
 		if not self.sdcard.current_file:
 			if os.path.isfile(fullpath):
-				self.printfile = open(fullpath, 'rb')				#	get file object as klippy would do
+				self.printfile = open(fullpath, 'rb')									#	get file object as klippy would do
 				self.printfile.seek(0, os.SEEK_END)
 				self.printfile.seek(0)
-				self.sdcard.current_file = self.printfile 			#	set it as current file
-				self.sdcard.file_position = 0 						#	postions / size
+				self.sdcard.current_file = self.printfile 								#	set it as current file
+				self.sdcard.file_position = 0 											#	postions / size
 				self.sdcard.file_size = os.stat(fullpath).st_size
-				self.cached_file_info = self.read_gcode(fullpath) 	#	refresh cached file info - its used during printng
-				self.print_data = None 								#	reset printdata as this is a new print
+				self.print_data = None 													#	reset printdata as this is a new print
 			else:
 				import pdb; pdb.set_trace()
 				raise 'gcodefile' + fullpath + ' not found'
