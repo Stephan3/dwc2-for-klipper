@@ -7,6 +7,7 @@ import json
 import threading
 # for webserver
 import tornado.web
+import tornado.gen
 import base64
 import uuid
 import os
@@ -103,10 +104,10 @@ class web_dwc2:
 	def dwc2(self):
 		def tornado_logger(req):
 			fressehaltn = []
-			fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply" ]
-			values = [req.request.remote_ip, req.request.method, req.request.uri]
+			#fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply" ]
+			values = [str(time.time())[-8:], req.request.remote_ip, req.request.method, req.request.uri]
 			if req.request.uri not in fressehaltn:
-				logging.info("DWC2 tornado: ".join(values))	#	bind this to debug later
+				logging.info("DWC2:" + " - ".join(values))	#	bind this to debug later
 		def launch_tornado(application):
 			#time.sleep(10)	#	delay startup so dwc2 can timeout
 			logging.info( "DWC2 starting at: http://" + str(self.adress) + ":" + str(self.port) )
@@ -171,6 +172,8 @@ class web_dwc2:
 			self.web_dwc2 = web_dwc2
 			self.repl_ = {"err":1}
 
+		@tornado.web.asynchronous
+		@tornado.gen.coroutine
 		def get(self, *args):
 
 			if self.request.remote_ip not in self.web_dwc2.sessions.keys() and "rr_connect" not in self.request.uri:
@@ -205,7 +208,7 @@ class web_dwc2:
 				self.repl_ = self.web_dwc2.rr_files(self)
 			#	filehandling - fileinfo / gcodeinfo
 			elif "rr_fileinfo" in self.request.uri:
-				self.repl_ = self.web_dwc2.rr_fileinfo(self)
+				self.repl_ = yield self.web_dwc2.rr_fileinfo(self)
 			#	gcode request
 			elif "rr_gcode" in self.request.uri:
 				self.repl_ = self.web_dwc2.rr_gcode( self )
@@ -258,6 +261,7 @@ class web_dwc2:
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
 
+		#@tornado.web.asynchronous
 		def post(self, *args):
 
 			#	filehandling - uploads
@@ -451,10 +455,10 @@ class web_dwc2:
 
 		return repl_
 	#	dwc fileinfo - getting gcode info
+	@tornado.gen.coroutine
 	def rr_fileinfo(self, web_):
 
 		#import pdb; pdb.set_trace()
-
 		#	hits if we are in printing state
 		if web_.get_argument('name', default=None) is not None:
 			path_ = self.sdpath + web_.get_argument('name').replace("0:", "")
@@ -795,7 +799,6 @@ class web_dwc2:
 					"curr_layer_start": 0 ,
 					"curr_layer_dur" : 0 ,
 					"heat_time": 0 ,
-					"zhop": False ,
 					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(10) ] ,
 					"last_switch_z": 0,
 				}
@@ -816,8 +819,8 @@ class web_dwc2:
 
 			else:
 				if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and filament_used > 50 \
-						and max( self.print_data.get('last_zposes') ) / min( self.print_data.get('last_zposes') ) == 1 :
-					print( "layerswitch to: " + str(self.print_data['curr_layer']+1) + " last_z: " + str(gcode_stats['last_zpos']) + " zhistory: " + str(self.print_data['last_zposes']) )
+						and max( self.print_data.get('last_zposes', [2]) ) / min( self.print_data.get('last_zposes', [1]) ) == 1 :
+
 					if self.print_data['firstlayer_dur'] == 0:
 						self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
 					self.print_data.update({
