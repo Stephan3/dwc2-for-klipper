@@ -5,6 +5,7 @@
 import logging
 import json
 import threading
+from multiprocessing import Process, Queue
 # for webserver
 import tornado.web
 import tornado.gen
@@ -470,7 +471,11 @@ class web_dwc2:
 			repl_ = { "err": 1 }
 
 		if not path_ in self.file_infos.keys():
-			self.file_infos['running_file'] = self.file_infos[path_] = self.read_gcode(path_)
+			dict_ = Queue()
+			proc_ = Process(target=self.read_gcode, args=(path_,dict_))
+			proc_.start()
+			proc_.join(3)
+			self.file_infos['running_file'] = self.file_infos[path_] = dict_.get()
 		else:
 			self.file_infos['running_file'] = self.file_infos[path_]
 
@@ -1214,7 +1219,7 @@ class web_dwc2:
 			}
 		return ret_
 	#	read and parse gcode files
-	def read_gcode(self, path_):
+	def read_gcode(self, path_, dict_):
 
 		#	looks complicated but should be good maintainable
 		#	the heigth of all objects - regex
@@ -1363,7 +1368,7 @@ class web_dwc2:
 			"err": 0
 		}
 
-		return repl_
+		dict_.put(repl_)
 
 	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
