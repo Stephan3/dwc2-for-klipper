@@ -111,7 +111,7 @@ class web_dwc2:
 		def launch_tornado(application):
 			#time.sleep(10)	#	delay startup so dwc2 can timeout
 			logging.info( "DWC2 starting at: http://" + str(self.adress) + ":" + str(self.port) )
-			self.http_server = tornado.httpserver.HTTPServer( application )
+			self.http_server = tornado.httpserver.HTTPServer( application, max_buffer_size=500*1024*1024 )
 			self.http_server.listen( self.port )
 			tornado.ioloop.IOLoop.instance().start()
 		def debug_console(self):
