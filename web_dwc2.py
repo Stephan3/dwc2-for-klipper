@@ -220,11 +220,8 @@ class web_dwc2:
 				self.repl_ = self.web_dwc2.rr_move(self)
 			#	gcode reply
 			elif "rr_reply" in self.request.uri:
-				while self.web_dwc2.gcode_reply:
-					msg = self.web_dwc2.gcode_reply.pop(0).replace("!!", "Error: ").replace("//", "Warning: ")
-					self.write( msg )
+				self.web_dwc2.rr_reply(self)
 				return
-
 			#	status replys
 			elif "rr_status" in self.request.uri:
 
@@ -497,9 +494,7 @@ class web_dwc2:
 		}
 
 		#	tell the webif that we are pending with given number of commands - will it wait for same number of replys ????("seq")
-		web_.write( json.dumps({'buff': 0, 'err': 0}) )
-		web_.finish()
-
+		web_.write( json.dumps({'buff': 1, 'err': 0}) )
 		#	Handle emergencys - just do it now
 		for code in gcodes:
 			if 'M112' in code:
@@ -552,6 +547,11 @@ class web_dwc2:
 			return {'err': 0}
 
 		return {'err': 1}
+	#	dwc rr_reply - fetces gcodes
+	def rr_reply(self, web_):
+		while self.gcode_reply:
+			msg = self.gcode_reply.pop(0).replace("!!", "Error: ").replace("//", "Warning: ")
+			web_.write( msg )
 	# 	rr_status_0 if klipper is down/failed to start
 	def rr_status_0(self):
 
@@ -836,9 +836,15 @@ class web_dwc2:
 						'curr_layer': self.print_data['curr_layer'] + 1 ,
 						'last_switch_z': gcode_stats['last_zpos']
 						})
-					self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
+
+
+			if self.print_data['curr_layer_start'] == 0:
+				self.print_data['curr_layer_dur'] = 0
+			else:
+				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
 
 			self.print_data['print_dur'] = time.time() - self.print_data['print_start']
+
 
 		now = self.reactor.monotonic() + 0.25
 
@@ -1064,8 +1070,6 @@ class web_dwc2:
 				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
 
 		self.gcode_reply.append(msg)
-
-		#import pdb; pdb.set_trace()
 	#	recall for gcode ecxecution is needed ( threadsafeness )
 	def gcode_reactor_callback(self, eventtime):
 		#	if user adds commands return the callback
