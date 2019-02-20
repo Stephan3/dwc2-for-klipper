@@ -32,6 +32,12 @@ down immediately no gcode queue or similar in between, it just overrides everyth
   * can we calc this? movelength/junction/acceleration is there
 * ......
 
+## Things you should know
+
+* Klipper messages are marked as warnings.
+ * Noramly klipper knows ok and error
+* ....
+
 ## Installation
 
 ### Prerequirements
@@ -44,7 +50,7 @@ sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
 
 Maybe you´ll need to change the startup system for klipper to access ~/klipper/klippy/klippy.py
 
-##### on Octopi / Ubuntu / Debian (untested, feedback wanted)
+##### On Octopi / Ubuntu / Debian (untested, feedback wanted)
 I asume here that you used the octopi install script from Kevins github.
 ```
 sudo apt install wget gunzip tar
@@ -69,7 +75,7 @@ unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 sudo systemctl start klipper
 ```
 
-##### if you want backwards compatibility to dwc1:
+##### if you want backwards compatibility to dwc 1:
 ```
 cd ~/sdcard/dwc2/web 
 wget https://github.com/chrishamm/DuetWebControl/releases/download/1.22.5/DuetWebControl-1.22.5.zip
