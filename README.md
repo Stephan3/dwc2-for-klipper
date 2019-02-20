@@ -36,6 +36,9 @@ down immediately no gcode queue or similar in between, it just overrides everyth
 
 * Klipper messages are marked as warnings.
  * Noramly klipper knows ok and error
+* Klippers printer.cfg is displayed as a virtual file (cinfig.g) in System section
+ * restart after conf edits works
+* The macros you define in printer.cfg are displayed as virtal files wthin DWCs macros
 * ....
 
 ## Installation
