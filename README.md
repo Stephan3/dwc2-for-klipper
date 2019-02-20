@@ -26,7 +26,7 @@ down immediately no gcode queue or similar in between, it just overrides everyth
 
 * webcam integration
 * heightmap
-* printsimuation
+* printsimulation
 * actual machinespeed, only displaying the requested values
   * klipper does not have this feedback (yet)? due to its lookahead feature 
   * can we calc this? movelength/junction/acceleration is there
@@ -37,7 +37,7 @@ down immediately no gcode queue or similar in between, it just overrides everyth
 ### Prerequirements
 python2, tornado, gunzip, unzip, wget
 
-##### oOn arch:
+##### On arch:
 ```
 sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
 ```
@@ -45,17 +45,23 @@ sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
 Maybe you´ll need to change the startup system for klipper to access ~/klipper/klippy/klippy.py
 
 ##### on Octopi / Ubuntu / Debian (untested, feedback wanted)
+I asume here that you used the octopi install script from Kevins github.
 ```
-sudo apt install python python-pip wget gunzip tar
+sudo apt install wget gunzip tar
 ```
 
 Then switch to your klipper user and:
 ```
 sudo systemctl stop klipper
 cd ~
+PYTHONDIR="${HOME}/klippy-env"
+virtualenv ${PYTHONDIR}
+${PYTHONDIR}/bin/pip install tornado==5.1.1
+
 git clone https://github.com/Stephan3/klipper.git
-git clone https://your_git_user_here@github.com/Stephan3/dwc2-for-klipper.git
+git clone https://github.com/Stephan3/dwc2-for-klipper.git
 ln -s ~/dwc2-for-klipper/web_dwc2.py ~/klipper/klippy/extras/web_dwc2.py
+
 mkdir -p ~/sdcard/dwc2/web
 cd ~/sdcard/dwc2/web 
 wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC3/DuetWebControl.zip
