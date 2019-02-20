@@ -256,7 +256,8 @@ class web_dwc2:
 				logging.warn("DWC2 - unhandled ?GET? " + self.request.uri)
 
 			try:
-				self.write( json.dumps(self.repl_) )
+				if self.repl_:
+					self.write( json.dumps(self.repl_) )
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
 
@@ -362,7 +363,6 @@ class web_dwc2:
 			with open(path_, "rb") as f:
 				web_.write( f.read() )
 
-			return {'err':0}
 		else:
 			return {"err":1}
 	#	dwc rr_files - dwc1 thing
@@ -1053,7 +1053,7 @@ class web_dwc2:
 	#	rrf restart command
 	def cmd_M999(self, params):
 		#needs0 otherwise the printer gets restarted after emergency buttn is pressed
-		return 0
+		return "RESTART"
 	#	getting response by callback
 	def gcode_response(self, msg):
 		
