@@ -7,6 +7,9 @@ For first trys its a good idea to limit printer speed in config to a low value l
 If a ${disastercondition of doom} is occouring, you can hit the emergency button. The emergency button shuts
 down immediately no gcode queue or similar in between, it just overrides everything.
 
+![Alt text](screenshots/screen_1.PNG?raw=true "screen 1")
+![Alt text](screenshots/screen_2.PNG?raw=true "screen 2")
+
 ## What works
 
 * printing from klippers virtual sdcard
