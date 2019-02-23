@@ -38,11 +38,11 @@ down immediately no gcode queue or similar in between, it just overrides everyth
 
 ## Things you should know
 
-* Klipper messages are marked as warnings.
+* Klipper messages are marked as warnings.(yellow)
  * Noramly klipper knows ok and error
-* Klippers printer.cfg is displayed as a virtual file (cinfig.g) in System section
+* Klippers printer.cfg is displayed as a virtual file (config.g) in System section
  * restart after conf edits works
-* The macros you define in printer.cfg are displayed as virtal files wthin DWCs macros
+* The macros you define in printer.cfg are displayed as virtual files wthin DWCs macros
 * ....
 
 ## Installation
