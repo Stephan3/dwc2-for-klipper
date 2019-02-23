@@ -24,11 +24,12 @@ down immediately no gcode queue or similar in between, it just overrides everyth
 * homing / extruding / moving
 * heater control
 * setting fanspeed / extrusionmultipler / speedfactor during print in statuswindow
+* Heightmap is working. (needs manual ```BED_MESH_CALIBATE```) It is kept only for displaying, even after ```BED_MESH_CLEAR```
 
 ## What is not working
 
 * webcam integration
-* heightmap
+* ~~heightmap~~
 * printsimulation
 * actual machinespeed, only displaying the requested values
   * klipper does not have this feedback (yet)? due to its lookahead feature 
