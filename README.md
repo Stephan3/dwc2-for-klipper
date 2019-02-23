@@ -2,7 +2,7 @@
 A translator between DWC2 and Klipper
 
 # !!! CAUTION !!!
-Its an early stage, horrible thinkgs can happen to you, your printer, your moms cellar or your cat.
+Its an early stage, horrible things can happen to you, your printer, your moms cellar or your cat.
 For first trys its a good idea to limit printer speed in config to a low value like 25mm/s or 50mm/s.
 If a ${disastercondition of doom} is occouring, you can hit the emergency button. The emergency button shuts
 down immediately no gcode queue or similar in between, it just overrides everything.
