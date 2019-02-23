@@ -34,10 +34,11 @@ class web_dwc2:
 		self.webpath = config.get( 'web_path', "dwc2/web" )
 		self.printername =  config.get( 'printer_name', "Klipper" )
 		#	klippy objects
+		self.bed_mesh = None
 		self.printer = config.get_printer()
 		self.reactor = self.printer.get_reactor()
 		self.gcode = self.printer.lookup_object('gcode')
-		self.configfile = self.printer.lookup_object('configfile')
+		self.configfile = self.printer.lookup_object('configfile').read_main_config()
 		#	gcode execution needs
 		self.gcode_queue = []	#	containing gcode user pushes from dwc2
 		self.gcode_reply = []	#	contains the klippy replys
@@ -50,12 +51,11 @@ class web_dwc2:
 		self.start_time = time.time()
 		#	grab stuff from config file
 		self.klipper_config = self.printer.get_start_args()['config_file']
-		con_ = self.configfile.read_main_config()
-		self.sdpath = con_.getsection("virtual_sdcard").get("path", None)
+		self.sdpath = self.configfile.getsection("virtual_sdcard").get("path", None)
 		if not self.sdpath:
 			logging.error( "DWC2 failed to start, no sdcard configured" )
 			return
-		self.kin_name = con_.getsection("printer").get("kinematics")
+		self.kin_name = self.configfile.getsection("printer").get("kinematics")
 		self.web_root = self.sdpath + "/" + self.webpath
 		if not os.path.isfile( self.web_root + "/" + "index.html" ):
 			logging.error( "DWC2 failed to start, no webif found in " + self.web_root )
@@ -71,10 +71,12 @@ class web_dwc2:
 	#	function once reactor calls, once klipper feels good
 	def handle_ready(self):
 		#	klippy related
-		self.toolhead = self.printer.lookup_object('toolhead', None)
-		self.sdcard = self.printer.lookup_object('virtual_sdcard', None)
-		self.fan = self.printer.lookup_object('fan', None)
+		self.bed_mesh = self.printer.lookup_object('bed_mesh', None)
 		self.chamber = self.printer.lookup_object('chamber', None)
+		self.heater_bed = self.printer.lookup_object('heater_bed', None)
+		self.fan = self.printer.lookup_object('fan', None)
+		self.sdcard = self.printer.lookup_object('virtual_sdcard', None)
+		self.toolhead = self.printer.lookup_object('toolhead', None)
 		#	hopeflly noone get more than 4 extruders up :D
 		self.extruders = [
 			self.printer.lookup_object('extruder0', None) ,
@@ -82,7 +84,6 @@ class web_dwc2:
 			self.printer.lookup_object('extruder2', None) ,
 			self.printer.lookup_object('extruder3', None)
 		]
-		self.heater_bed = self.printer.lookup_object('heater_bed', None)
 		self.kinematics = self.toolhead.get_kinematics()
 
 		# print data for tracking layers during print
@@ -350,6 +351,14 @@ class web_dwc2:
 		#	ovverride for config file
 		if "/sys/" in path_ and "config.g" in web_.get_argument('name').replace("0:", ""):
 			path_ = self.klipper_config
+
+		#	handle heigthmap
+		if 'heightmap.csv' in path_:
+			repl_ = self.get_heigthmap()
+			if repl_:
+				with open(path_, "w") as f:
+					for line in repl_:
+						f.write( line + '\n')
 
 		if os.path.isfile(path_):
 
@@ -1065,7 +1074,7 @@ class web_dwc2:
 		
 		if self.klipper_ready:
 			stat_ = self.get_printer_status()
-			if stat_ in [ 'S', 'P', 'D' ]:
+			if stat_ in [ 'S', 'P', 'D', 'B' ]:
 				#SPD? seriously? printing state
 				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
 
@@ -1125,6 +1134,52 @@ class web_dwc2:
 ##
 #	Helper functions getting/parsing data
 ##
+
+	def get_heigthmap(self):
+		#	translates the klipper heighthmap to dwc format
+		#	lets asume user is intelegent enough to probe with correct probe offset
+		def calc_mean(matrix_):
+
+			matrix_tolist = []
+			for line in matrix_:
+				matrix_tolist += line
+
+			return float(sum(matrix_tolist)) / len(matrix_tolist)
+
+		def calc_stdv(matrix_):
+			from math import sqrt
+			matrix_tolist = []
+			for line in matrix_:
+				matrix_tolist += line
+
+			mean = float(sum(matrix_tolist)) / len(matrix_tolist)
+			return sqrt(float(reduce(lambda x, y: x + y, map(lambda x: (x - mean) ** 2, matrix_tolist))) / len(matrix_tolist)) # Stackoverflow - liked that native short solution
+
+		#
+
+		if self.bed_mesh:
+
+			hmap = []
+			self.configfile.getsection("virtual_sdcard").get("path", None)
+			z_matrix = self.bed_mesh.calibrate.probed_z_table
+			mesh_data = self.bed_mesh.z_mesh				#	see def print_mesh in bed_mesh.py line 572
+
+			meane_ = round( calc_mean(z_matrix), 3)
+			stdev_ = round( calc_stdv(z_matrix) , 3)
+
+			hmap.append( 'RepRapFirmware height map file v2 generated at ' + str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M')) + ', mean error ' + str(meane_) + ', deviation ' + str(stdev_))
+			hmap.append('xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum')
+			xspace_ = ( mesh_data.mesh_x_max - mesh_data.mesh_x_min ) / mesh_data.mesh_x_count
+			yspace_ = ( mesh_data.mesh_y_max - mesh_data.mesh_y_min ) / mesh_data.mesh_y_count
+			hmap.append( str(mesh_data.mesh_x_min) + ',' + str(mesh_data.mesh_x_max) + ',' + str(mesh_data.mesh_y_min) + ',' + str(mesh_data.mesh_y_max) + \
+				',-1.00,' + str(xspace_) + ',' + str(yspace_) + ',' + str(mesh_data.mesh_x_count) + ',' + str(mesh_data.mesh_y_count) )
+
+			for line in z_matrix:
+				hmap.append( '  ' + ',  '.join( map(str, line) ))
+
+			return hmap
+
+		return
 
 	def get_printer_status(self):
 
