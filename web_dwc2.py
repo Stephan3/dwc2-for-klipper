@@ -549,7 +549,7 @@ class web_dwc2:
 	#	dwc rr_mkdir
 	def rr_mkdir(self, web_):
 
-		path_ = self.sdpath + web_.get_argument('dir').replace("0:", "")
+		path_ = self.sdpath + web_.get_argument('dir').replace("0:", "").replace(' ', '_')
 
 		if not os.path.exists(path_):
 			os.makedirs(path_)
@@ -975,7 +975,7 @@ class web_dwc2:
 	#	dwc rr_upload - uploading files to sdcard
 	def rr_upload(self, web_):
 
-		path_ = self.sdpath + web_.get_argument('name').replace("0:", "")
+		path_ = self.sdpath + web_.get_argument('name').replace("0:", "").replace(' ', '_')
 		dir_ = os.path.dirname(path_)
 
 		ret_ = {"err":1}
