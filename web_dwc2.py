@@ -661,7 +661,20 @@ class web_dwc2:
 					}
 				]
 			},
-			"time": time.time() - self.start_time
+			"time": time.time() - self.start_time ,
+			#https://github.com/chrishamm/DuetWebControl/blob/92daf5d98db5def091a3f1a9d4324e1b953fc649/src/store/machine/connector/PollConnector.js#L470
+			#"output": {
+			#	"message": "Titten!"
+			#}
+			#"output": {
+			#	"msgBox": {
+			#		"mode": 2,
+			#		"title": "testtitle",
+			#		"msg": "hello world",
+			#		"timeout": 5000,	#	can be zero?
+			#		"controls": 0
+			#	}
+			#} # ok is M292
 		})
 
 		if self.chamber:
@@ -783,6 +796,19 @@ class web_dwc2:
 			#	"min": 24.2,
 			#	"cur": 24.3,
 			#	"max": 24.5
+			#}
+			#https://github.com/chrishamm/DuetWebControl/blob/92daf5d98db5def091a3f1a9d4324e1b953fc649/src/store/machine/connector/PollConnector.js#L470
+			#"output": {
+			#	"message": "Titten!"
+			#}
+			#"output": {
+			#	"msgBox": {
+			#		"mode": 2,
+			#		"title": "testtitle",
+			#		"msg": "hello world",
+			#		"timeout": 5000,	#	can be zero?
+			#		"controls": 1
+			#	}
 			#}
 		})
 		if self.chamber:
