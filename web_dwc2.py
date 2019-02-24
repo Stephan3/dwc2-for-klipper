@@ -1201,7 +1201,8 @@ class web_dwc2:
 				',-1.00,' + str(xspace_) + ',' + str(yspace_) + ',' + str(mesh_data.mesh_x_count) + ',' + str(mesh_data.mesh_y_count) )
 
 			for line in z_matrix:
-				hmap.append( '  ' + ',  '.join( map(str, line) ))
+				red_by_offset = map(lambda x: x-meane_,line)
+				hmap.append( '  ' + ',  '.join( map(str, red_by_offset) ))
 
 			return hmap
 
