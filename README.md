@@ -60,7 +60,7 @@ Maybe you´ll need to change the startup system for klipper to access ~/klipper/
 ##### On Octopi / Ubuntu / Debian (untested, feedback wanted)
 I asume here that you used the octopi install script from Kevins github.
 ```
-sudo apt install wget gunzip tar
+sudo apt install wget gzip tar
 ```
 
 Then switch to your klipper user and:
