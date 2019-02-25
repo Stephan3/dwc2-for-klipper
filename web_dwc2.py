@@ -513,7 +513,7 @@ class web_dwc2:
 		while gcodes:
 
 			#	parse commands - still magic. Wheres the original function in klipper?
-			params = self.parse_params(gcodes.pop(0))
+			params = self.parse_params(gcodes.pop(0).lower())
 
 			#	defaulting to original
 			handover = params['#original']
@@ -1111,7 +1111,7 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "SET_PIN", "STEPPER_BUZZ" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
 
