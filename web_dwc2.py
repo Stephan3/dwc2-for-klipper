@@ -513,7 +513,7 @@ class web_dwc2:
 		while gcodes:
 
 			#	parse commands - still magic. Wheres the original function in klipper?
-			params = self.parse_params(gcodes.pop(0).lower())
+			params = self.parse_params(gcodes.pop(0))
 
 			#	defaulting to original
 			handover = params['#original']
@@ -987,7 +987,7 @@ class web_dwc2:
 		if "/sys/" in path_ and "config.g" in web_.get_argument('name'):
 			path_ = self.klipper_config
 
-		with open(path_.replace(" ","_").lower(), 'w') as out:
+		with open(path_.replace(" ","_"), 'w') as out:
 			out.write(web_.request.body)
 
 		if os.path.isfile(path_):
@@ -1111,14 +1111,19 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "PID_CALIBRATE", "SET_PIN", "STEPPER_BUZZ" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "", "SET_PIN", "STEPPER_BUZZ" ]
+		lowers = [ "DUMP_TMC", "ENDSTOP_PHASE_CALIBRATE", "FORCE_MOVE", "PID_CALIBRATE", "SET_HEATER_TEMPERATURE", "SET_PIN", "SET_PRESSURE_ADVANCE", "STEPPER_BUZZ" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
 
 		while self.gcode_queue:
 
-			params = self.parse_params(self.gcode_queue.pop(0))
-			logging.error( "entering: " + params['#command'] )
+			handle_ = self.gcode_queue.pop(0)
+			params = self.parse_params(handle_)
+
+			if params['#command'] in lowers:
+				params = self.parse_params(handle_, low_=True)
+
 			try:
 				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
 				handler(params)
@@ -1134,9 +1139,12 @@ class web_dwc2:
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = False
 	#	parses gcode commands into params -took from johns work
-	def parse_params(self, line):
+	def parse_params(self, line, low_=False):
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
-		line = origline = line.strip()
+		if low_:
+			line = origline = line.strip().lower()
+		else:
+			line = origline = line.strip()
 		cpos = line.find(';')
 		if cpos >= 0:
 			line = line[:cpos]
