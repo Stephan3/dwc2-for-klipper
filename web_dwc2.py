@@ -987,7 +987,7 @@ class web_dwc2:
 		if "/sys/" in path_ and "config.g" in web_.get_argument('name'):
 			path_ = self.klipper_config
 
-		with open(path_.replace(" ","_"), 'w') as out:
+		with open(path_.replace(" ","_").lower(), 'w') as out:
 			out.write(web_.request.body)
 
 		if os.path.isfile(path_):
@@ -1111,7 +1111,7 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "SET_PIN", "STEPPER_BUZZ" ]
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "PID_CALIBRATE", "SET_PIN", "STEPPER_BUZZ" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
 
