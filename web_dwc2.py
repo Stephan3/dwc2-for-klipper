@@ -502,8 +502,9 @@ class web_dwc2:
 			'M999': self.cmd_M999		#	issue restart
 		}
 
-		#	tell the webif that we are pending with given number of commands - will it wait for same number of replys ????("seq")
-		web_.write( json.dumps({'buff': 1, 'err': 0}) )
+		#	allow - set heater, cancelprint, set bed, ,pause, resume, set fan, set speedfactor, set extrusion multipler, babystep
+		midprint_allow = [ 'G10', 'M0', 'M140', 'M24', 'M25', 'M106', 'M220', 'M221', 'M290' ]
+
 		#	Handle emergencys - just do it now
 		for code in gcodes:
 			if 'M112' in code:
@@ -518,6 +519,13 @@ class web_dwc2:
 			#	defaulting to original
 			handover = params['#original']
 
+			#	prevent midprint accidents
+			stat_ = self.get_printer_status()
+			if stat_ in [ 'P', 'D', 'R' ] and params['#command'] not in midprint_allow :
+				web_.write( json.dumps({'buff': 0, 'err': 0}) )
+				self.gcode_reply.append("!! " + params['#command'] + " not allowed during Print.\n")
+				continue
+
 			#	rewrite rrfs specials to klipper readable format
 			if params['#command'] in rrf_commands.keys():
 				func_ = rrf_commands.get(params['#command'])
@@ -527,7 +535,8 @@ class web_dwc2:
 					continue
 
 			self.gcode_queue.append(handover)
-
+		web_.write( json.dumps({'buff': 1, 'err': 0}) )
+		web_.finish()
 		self.reactor.register_callback(self.gcode_reactor_callback)
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
@@ -1463,7 +1472,6 @@ class web_dwc2:
 		}
 
 		dict_.put(repl_)
-
 	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
 
