@@ -27,6 +27,8 @@ class web_dwc2:
 	def __init__(self, config):
 
 		self.klipper_ready = False
+		self.popup = None
+		self.message = None
 		#	get config
 		self.config = config
 		self.adress = config.get( 'listen_adress', "127.0.0.1" )
@@ -86,11 +88,14 @@ class web_dwc2:
 		]
 		self.kinematics = self.toolhead.get_kinematics()
 
-		# print data for tracking layers during print
+		# 	print data for tracking layers during print
 		self.print_data = {}			#	printdata/layertimes etc
 		self.file_infos = {}			#	just read files once
 		self.klipper_ready = True
 		self.get_klipper_macros()
+		#	registering command
+		self.gcode.register_command( 'M292', self.cmd_M292,
+			desc="okay button in DWC2")
 	#	reactor calls this on klippy restart
 	def shutdown(self):
 		#	kill the thread here
@@ -502,8 +507,8 @@ class web_dwc2:
 			'M999': self.cmd_M999		#	issue restart
 		}
 
-		#	allow - set heater, cancelprint, set bed, ,pause, resume, set fan, set speedfactor, set extrusion multipler, babystep
-		midprint_allow = [ 'G10', 'M0', 'M140', 'M24', 'M25', 'M106', 'M220', 'M221', 'M290' ]
+		#	allow - set heater, cancelprint, set bed, ,pause, resume, set fan, set speedfactor, set extrusion multipler, babystep, ok in popup
+		midprint_allow = [ 'G10', 'M0', 'M140', 'M24', 'M25', 'M106', 'M220', 'M221', 'M290', 'M292' ]
 
 		#	Handle emergencys - just do it now
 		for code in gcodes:
@@ -523,7 +528,8 @@ class web_dwc2:
 			stat_ = self.get_printer_status()
 			if stat_ in [ 'P', 'D', 'R' ] and params['#command'] not in midprint_allow :
 				web_.write( json.dumps({'buff': 0, 'err': 0}) )
-				self.gcode_reply.append("!! " + params['#command'] + " not allowed during Print.\n")
+				#self.set_popup(msg='<b>' + params['#command'] + " not allowed during Print.</b>")
+				#self.set_message(msg=params['#command'] + ' not allowed during print.')
 				continue
 
 			#	rewrite rrfs specials to klipper readable format
@@ -574,6 +580,9 @@ class web_dwc2:
 	def rr_status_0(self):
 
 		#	just put in things really needed to make dwc2 happy
+		if self.status_0.get("output", {}).get("message", None) :
+			self.status_0.update({ "output": {} })
+			self.message = None
 
 		self.status_0.update({
 			"status": self.get_printer_status(),
@@ -607,6 +616,11 @@ class web_dwc2:
 			"mountedVolumes": 1 ,
 			"name": self.printername
 		})
+
+		if self.popup:
+			self.status_0.update(
+				self.popup
+			)
 	#	dwc rr_status 1
 	def rr_status_1(self):
 		now = self.reactor.monotonic() + 0.25
@@ -614,10 +628,15 @@ class web_dwc2:
 		extr_stat = self.get_extr_stats(now)
 		bed_stats = self.get_bed_stats(now)
 		gcode_stats = self.gcode.get_status(now)
+
 		if self.fan:
 			fan_stats = [ self.fan.get_status(now) ]	#	this can be better
 		else:
 			fan_stats = []
+
+		if self.status_1.get("output", {}).get("message", None) :
+			self.status_1.update({ "output": {} })
+			self.message = None
 
 		self.status_1.update({
 			"status": self.get_printer_status(),
@@ -686,6 +705,16 @@ class web_dwc2:
 			#} # ok is M292
 		})
 
+		if self.message:
+			self.status_1.update(
+				self.message
+			)
+
+		if self.popup:
+			self.status_1.update(
+				self.popup
+			)
+
 		if self.chamber:
 			chamber_stats = self.chamber.get_status(0)
 			self.status_1['temps'].update({
@@ -709,6 +738,10 @@ class web_dwc2:
 			fan_stats = [ self.fan.get_status(now) ]	#	this can be better
 		else:
 			fan_stats = []
+
+		if self.status_2.get("output", {}).get("message", None) :
+			self.status_2.update({ "output": {} })
+			self.message = None
 
 		#	dummy data
 		self.status_2.update({
@@ -820,6 +853,17 @@ class web_dwc2:
 			#	}
 			#}
 		})
+
+		if self.message:
+			self.status_2.update(
+				self.message
+			)
+
+		if self.popup:
+			self.status_2.update(
+				self.popup
+			)
+
 		if self.chamber:
 			chamber_stats = self.chamber.get_status(0)
 			self.status_2['temps'].update({ 
@@ -889,6 +933,9 @@ class web_dwc2:
 
 			self.print_data['print_dur'] = time.time() - self.print_data['print_start']
 
+		if self.status_3.get("output", {}).get("message", None) :
+			self.status_3.update({ "output": {} })
+			self.message = None
 
 		now = self.reactor.monotonic() + 0.25
 
@@ -967,6 +1014,16 @@ class web_dwc2:
 				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos['running_file'].get('layercount', 1) ) * self.file_infos['running_file'].get('printTime', 1)
 			}
 		})
+
+		if self.message:
+			self.status_3.update(
+				self.message
+			)
+
+		if self.popup:
+			self.status_3.update(
+				self.popup
+			)
 
 		if self.chamber:
 			chamber_stats = self.chamber.get_status(0)
@@ -1100,6 +1157,9 @@ class web_dwc2:
 		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
 
 		return 0
+	#	Ok button in DWC webif
+	def cmd_M292(self, params):
+		self.popup = None
 	#	rrf restart command
 	def cmd_M999(self, params):
 		#needs0 otherwise the printer gets restarted after emergency buttn is pressed
@@ -1139,6 +1199,8 @@ class web_dwc2:
 			except Exception as e:
 				self.gcode_reply.append( "" )
 				logging.error( "failed: " + params['#command'] + str(e) )
+				#self.set_popup(msg=params['#command'] + ' resulted with: ' + str(e))
+				#self.set_message(msg="Warning: " + params['#command'] + ' resulted with: ' + str(e))
 				time.sleep(1)	#	not beautiful but webif ignores errors on button commands otherwise
 				self.gcode_reply.append( "!! " + str(e) + "\n" )
 			else:
@@ -1178,6 +1240,7 @@ class web_dwc2:
 #	Helper functions getting/parsing data
 ##
 
+	#	transforming klippers heigthmap into dwc readable format
 	def get_heigthmap(self):
 		#	translates the klipper heighthmap to dwc format
 		#	lets asume user is intelegent enough to probe with correct probe offset
@@ -1224,7 +1287,7 @@ class web_dwc2:
 			return hmap
 
 		return
-
+	#	delivering printer states, webif can use
 	def get_printer_status(self):
 
 		#	case 'F': return 'updating';
@@ -1472,6 +1535,25 @@ class web_dwc2:
 		}
 
 		dict_.put(repl_)
+	#	setting message
+	def set_message(self, msg='msg'):
+		self.message = {
+			"output": {
+				"message": msg
+			}
+		}
+	#	setting up a popup
+	def set_popup(self, title='Action failed ', msg='Some command just failed.', timeout=0):
+		self.popup = { "output": {
+					"msgBox": {
+						"mode": 2,
+						"title": title + str(time.time()) ,
+						"msg": msg,
+						"timeout": timeout,
+						"controls": 0
+					}
+				} # ok is M292
+			}
 	#	helpful if you mussed something in status 0-3
 	def dict_compare(self, d1, d2):
 
