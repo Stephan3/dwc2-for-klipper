@@ -28,6 +28,7 @@ A translator between DWC2 and Klipper
 * actual machinespeed, only displaying the requested values
   * klipper does not have this feedback (yet)? due to its lookahead feature 
   * can we calc this? movelength/junction/acceleration is there
+* cancel/pause/resume macros. I will do this soon
 * ......
 
 ## Things you should know
