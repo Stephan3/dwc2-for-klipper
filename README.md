@@ -94,7 +94,7 @@ path: /home/pi/sdcard
 [web_dwc2]
 # optional - defaulting to Klipper
 printer_name: Reiner Calmund
-# optional - defaulting to 0.0.0.0
+# optional - defaulting to 127.0.0.1
 listen_adress: 0.0.0.0
 # needed - use above 1024 as nonroot
 listen_port: 4750
