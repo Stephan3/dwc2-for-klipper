@@ -62,6 +62,7 @@ Then switch to your klipper user and:
 ```
 sudo systemctl stop klipper
 cd ~
+mv klipper klipper_backup 
 PYTHONDIR="${HOME}/klippy-env"
 virtualenv ${PYTHONDIR}
 ${PYTHONDIR}/bin/pip install tornado==5.1.1
