@@ -19,10 +19,13 @@ A translator between DWC2 and Klipper
 * heater control
 * setting fanspeed / extrusionmultipler / speedfactor during print in statuswindow
 * Heightmap is working. (needs manual ```BED_MESH_CALIBATE```) It is kept only for displaying, even after ```BED_MESH_CLEAR```
+* webcam integration works now
+  * with mjpeg-streamer add the streaming url to settings. example: http://192.168.2.20:8080/?action=stream
+  * With youtube live https://webcam.io/support/howto-embed-youtube-live/
 
 ## What is not working
 
-* webcam integration
+* ~~webcam integration~~
 * ~~heightmap~~
 * printsimulation
 * actual machinespeed, only displaying the requested values
