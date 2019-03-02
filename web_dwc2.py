@@ -27,6 +27,7 @@ class web_dwc2:
 	def __init__(self, config):
 
 		self.klipper_ready = False
+		self.last_state = 'O'
 		self.popup = None
 		self.message = None
 		#	get config
@@ -500,6 +501,7 @@ class web_dwc2:
 		rrf_commands = {
 			'G10': self.cmd_G10 ,		#	set heaters temp
 			'M0': self.cmd_M0 ,			#	cancel SD print
+			'M24': self.cmd_M24 ,		#	resume sdprint
 			'M32': self.cmd_M32 ,		#	Start sdprint
 			'M98': self.cmd_M98 ,		#	run macro
 			'M106': self.cmd_M106 ,		#	set fan
@@ -1080,9 +1082,14 @@ class web_dwc2:
 		self.sdcard.work_timer = None 			#	reset worktimer
 		self.sdcard.current_file = None 		#	
 		self.printfile = None
-
+		self.cancel_macro()
 		#	let user define a cancel/pause print macro`?
 		return 0
+	# 	rrf M24 - start/resume print from sdcard
+	def cmd_M24(self, params):
+		if self.sdcard.file_position > 0:
+			self.resume_macro()
+		return "M24"
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
@@ -1164,6 +1171,23 @@ class web_dwc2:
 	def cmd_M999(self, params):
 		#needs0 otherwise the printer gets restarted after emergency buttn is pressed
 		return "RESTART"
+	#	launch custom cancel macro
+	def cancel_macro(self):
+		macro_path = self.sdpath + '/macros/' + 'cancel.g'
+
+		if os.path.isfile(macro_path):
+
+			with open( macro_path ) as f:
+				lines = f.readlines()
+
+			for line in [x.strip() for x in lines]:
+				self.gcode_queue.append(line)
+
+		elif 'CANCEL_PRINT' in self.klipper_macros:
+			self.gcode_queue.append('CANCEL_PRINT')
+
+		if self.gcode_queue:
+			self.reactor.register_callback(self.gcode_reactor_callback)
 	#	getting response by callback
 	def gcode_response(self, msg):
 		
@@ -1209,6 +1233,24 @@ class web_dwc2:
 					self.gcode_reply.append( "" )	#	pseudo ack
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = False
+	#	launch individual pause macro
+	def pause_macro(self):
+		#	store old XYZ position somewhere ?
+		macro_path = self.sdpath + '/macros/' + 'pause.g'
+
+		if os.path.isfile(macro_path):
+
+			with open( macro_path ) as f:
+				lines = f.readlines()
+
+			for line in [x.strip() for x in lines]:
+				self.gcode_queue.append(line)
+
+		elif 'PAUSE_PRINT' in self.klipper_macros:
+			self.gcode_queue.append('PAUSE_PRINT')
+
+		if self.gcode_queue:
+			self.reactor.register_callback(self.gcode_reactor_callback)
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line, low_=False):
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
@@ -1233,9 +1275,24 @@ class web_dwc2:
 		params['#command'] = cmd = parts[0] + parts[1].strip()
 
 		return params
+	#	launch individual resume macro
+	def resume_macro(self):
 
-	#	return status for infoblock parts taken from Fheilmann
+		macro_path = self.sdpath + '/macros/' + 'resume.g'
 
+		if os.path.isfile(macro_path):
+
+			with open( macro_path ) as f:
+				lines = f.readlines()
+
+			for line in [x.strip() for x in lines]:
+				self.gcode_queue.append(line)
+
+		elif 'RESUME_PRINT' in self.klipper_macros:
+			self.gcode_queue.append('RESUME_PRINT')
+
+		if self.gcode_queue:
+			self.reactor.register_callback(self.gcode_reactor_callback)
 ##
 #	Helper functions getting/parsing data
 ##
@@ -1302,20 +1359,27 @@ class web_dwc2:
 		#	case 'T': return 'changingTool';
 		#	case 'I': return 'idle';
 
-		if "Printer is ready" != self.printer.get_state_message():
+		state = 'I'
+
+		if 'Printer is ready' != self.printer.get_state_message():
 			self.klipper_ready = False
-			return "O"
+			return 'O'
+
+		if self.gcode.is_processing_data:
+			state = 'B'
 
 		if self.sdcard.current_file:
 			if self.sdcard.must_pause_work:
-				return "D" if self.sdcard.work_timer else "S"
-			if self.sdcard.current_file and self.sdcard.work_timer:
-				return "P"
+				state = 'D' if self.sdcard.work_timer else 'S'
+			elif self.sdcard.current_file and self.sdcard.work_timer:
+				state = 'P'
 
-		if self.gcode.is_processing_data:
-			return "B"
+		#	handle switching from pausing/processing to paused
+		if (self.last_state == 'D' or self.last_state == 'P') and state == 'S':
+				self.pause_macro()
 
-		return "I"
+		self.last_state = state
+		return state
 	#	import klipper macros as virtual files
 	def get_klipper_macros(self):
 
