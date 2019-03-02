@@ -486,10 +486,8 @@ class web_dwc2:
 			dict_ = Queue()
 			proc_ = Process(target=self.read_gcode, args=(path_,dict_))
 			proc_.start()
-			proc_.join(3)
-			self.file_infos['running_file'] = self.file_infos[path_] = dict_.get()
-		else:
-			self.file_infos['running_file'] = self.file_infos[path_]
+			proc_.join(5)
+			self.file_infos[path_] = dict_.get()
 
 		return self.file_infos[path_]
 	#	dwc rr_gcode - append to gcode_queue
@@ -1006,14 +1004,14 @@ class web_dwc2:
 			"fractionPrinted": self.sdcard.get_status(now).get('progress', 0) , # percent done
 			"filePosition": self.sdcard.file_position,
 			"firstLayerDuration": self.print_data.get('firstlayer_dur', 1) if self.print_data.get('firstlayer_dur', 0) > 0 else self.print_data.get('curr_layer_dur', 1),
-			"firstLayerHeight": self.file_infos['running_file'].get('firstLayerHeight', 0.2),
+			"firstLayerHeight": self.file_infos.get('running_file', {}).get('firstLayerHeight', 0.2),
 			"printDuration": self.print_data.get('print_dur', 1) ,
 			"warmUpDuration": self.print_data.get('heat_time', 1),
 			"timesLeft": {
-				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.file_infos['running_file'].get('printTime', 1),
+				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.file_infos.get('running_file',{}).get('printTime', 1),
 				"filament": (1-( sum(self.toolhead.get_position()[3:]) - self.print_data.get("extr_start", 1) ) \
-								/ sum(self.file_infos['running_file'].get( "filament", 1) ) ) * self.file_infos['running_file'].get('printTime', 1),
-				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos['running_file'].get('layercount', 1) ) * self.file_infos['running_file'].get('printTime', 1)
+								/ sum(self.file_infos.get('running_file', {}).get( "filament", 1) ) ) * self.file_infos.get('running_file', {}).get('printTime', 1),
+				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos.get('running_file', {}).get('layercount', 1) ) * self.file_infos.get('running_file', {}).get('printTime', 1)
 			}
 		})
 
@@ -1101,6 +1099,8 @@ class web_dwc2:
 			fullpath = self.sdpath + '/gcodes/' + params['#original'].split()[1]
 		else:
 			fullpath = self.sdpath + file
+
+		self.file_infos['running_file'] = self.file_infos[fullpath]
 
 		#	load a file to scurrent_file if its none
 		if not self.sdcard.current_file:
