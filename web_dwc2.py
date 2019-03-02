@@ -31,6 +31,7 @@ class web_dwc2:
 		self.last_state = 'O'
 		self.popup = None
 		self.message = None
+		self.serial = serial.Serial('/tmp/printer', 250000, timeout=0.050)
 		#	get config
 		self.config = config
 		self.adress = config.get( 'listen_adress', "127.0.0.1" )
@@ -98,7 +99,6 @@ class web_dwc2:
 		#	registering command
 		self.gcode.register_command( 'M292', self.cmd_M292,
 			desc="okay button in DWC2")
-		self.serial = serial.Serial('/tmp/printer', 250000, timeout=0.050)
 	#	reactor calls this on klippy restart
 	def shutdown(self):
 		#	kill the thread here
@@ -267,8 +267,8 @@ class web_dwc2:
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
 			#	if noones consuming klippers serial data -> flush it
-			if self.serial.in_waiting >= 2000:
-				self.serial.reset_input_buffer()
+			if self.web_dwc2.serial.in_waiting >= 2000:
+				self.web_dwc2.serial.reset_input_buffer()
 
 		def post(self, *args):
 
@@ -903,10 +903,10 @@ class web_dwc2:
 			#	first out, actual in - a rolling list
 			self.print_data['last_zposes'].pop(0)
 			self.print_data['last_zposes'].append(gcode_stats['last_zpos'])
-			filament_used = sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start']
+			self.print_data['filament_used'] = max( sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start'], 1)
 
 			if self.print_data['curr_layer_start'] == 0 \
-					and filament_used > 50:
+					and self.print_data['filament_used'] > 50:
 				#	now we know firstlayer started + heating ended
 				self.print_data.update({
 					'curr_layer_start': time.time() ,
@@ -915,7 +915,7 @@ class web_dwc2:
 					})
 
 			else:
-				if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and filament_used > 50 \
+				if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and self.print_data['filament_used'] > 50 \
 						and max( self.print_data.get('last_zposes', [2]) ) / min( self.print_data.get('last_zposes', [1]) ) == 1 :
 
 					if self.print_data['firstlayer_dur'] == 0:
@@ -1016,6 +1016,15 @@ class web_dwc2:
 				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos.get('running_file', {}).get('layercount', 1) ) * self.file_infos.get('running_file', {}).get('printTime', 1)
 			}
 		})
+		#	time left calc
+		#fkt_done = self.sdcard.get_status(now).get('progress', 0)
+		#file = ( 1 - fkt_done ) * self.print_data.get('print_dur', 1) / fkt_done
+		#filament = ( sum(self.file_infos.get('running_file', {}).get( "filament", 1)) - self.print_data['filament_used'] ) * \
+		#	self.print_data.get('print_dur', 1) / self.print_data['filament_used']
+		#layer = ( self.file_infos.get('running_file', {}).get('layercount', 1) - self.print_data.get('curr_layer', 1) ) * self.print_data.get('print_dur', 1) / self.print_data.get('curr_layer', 1)
+		#self.status_3.update(
+		#		{ "timesLeft": { "file": file, "filament": filament, "layer": layer } }
+		#	)
 
 		if self.message:
 			self.status_3.update(
