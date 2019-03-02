@@ -39,14 +39,14 @@ A translator between DWC2 and Klipper
 ## Things you should know
 
 * Klipper messages are marked as warnings.(yellow)
- * Noramly klipper knows ok and error
+  * Noramly klipper knows ok and error
 * Klippers printer.cfg is displayed as a virtual file (config.g) in System section
- * restart after conf edits works
+  * restart after conf edits works
 * The macros you define in printer.cfg are displayed as virtual files wthin DWCs macros
 * For pause and resume macros you can use:
- * kliper gcode macros pause_print resume_print cancel_print (not case sensitive)
- * dwc macros pause.g resume.g cacnel.g - this is in line with rrf
- * dwc macros are overriding klippers
+  * kliper gcode macros pause_print resume_print cancel_print (not case sensitive)
+  * dwc macros pause.g resume.g cacnel.g - this is in line with rrf
+  * dwc macros are overriding klippers
 * ....
 
 ## Installation
