@@ -22,6 +22,7 @@ A translator between DWC2 and Klipper
 * webcam integration works now
   * with mjpeg-streamer add the streaming url to settings. example: http://192.168.2.20:8080/?action=stream
   * With youtube live https://webcam.io/support/howto-embed-youtube-live/
+* pause/resume/cancel macros are working now - see Things you should know
 
 ## What is not working
 
@@ -31,7 +32,8 @@ A translator between DWC2 and Klipper
 * actual machinespeed, only displaying the requested values
   * klipper does not have this feedback (yet)? due to its lookahead feature 
   * can we calc this? movelength/junction/acceleration is there
-* cancel/pause/resume macros. I will do this soon
+* ~~cancel/pause/resume macros. I will do this soon~~
+* rrf/dwc cura plugin
 * ......
 
 ## Things you should know
@@ -41,6 +43,10 @@ A translator between DWC2 and Klipper
 * Klippers printer.cfg is displayed as a virtual file (config.g) in System section
  * restart after conf edits works
 * The macros you define in printer.cfg are displayed as virtual files wthin DWCs macros
+* For pause and resume macros you can use:
+ * kliper gcode macros pause_print resume_print cancel_print (not case sensitive)
+ * dwc macros pause.g resume.g cacnel.g - this is in line with rrf
+ * dwc macros are overriding klippers
 * ....
 
 ## Installation
