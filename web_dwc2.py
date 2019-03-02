@@ -17,6 +17,7 @@ import re
 import time
 import util
 import shutil
+import serial
 
 class web_dwc2:
 
@@ -97,6 +98,7 @@ class web_dwc2:
 		#	registering command
 		self.gcode.register_command( 'M292', self.cmd_M292,
 			desc="okay button in DWC2")
+		self.serial = serial.Serial('/tmp/printer', 250000, timeout=0.050)
 	#	reactor calls this on klippy restart
 	def shutdown(self):
 		#	kill the thread here
@@ -264,8 +266,10 @@ class web_dwc2:
 					self.write( json.dumps(self.repl_) )
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
+			#	if noones consuming klippers serial data -> flush it
+			if self.serial.in_waiting >= 2000:
+				self.serial.reset_input_buffer()
 
-		#@tornado.web.asynchronous
 		def post(self, *args):
 
 			#	filehandling - uploads
@@ -472,15 +476,13 @@ class web_dwc2:
 	@tornado.gen.coroutine
 	def rr_fileinfo(self, web_):
 
-		#import pdb; pdb.set_trace()
-		#	hits if we are in printing state
-		if web_.get_argument('name', default=None) is not None:
+		try:
 			path_ = self.sdpath + web_.get_argument('name').replace("0:", "")
-		else:
+		except:
 			path_ = self.sdcard.current_file.name
 
 		if not os.path.isfile(path_):
-			repl_ = { "err": 1 }
+			return { "err": 1 }
 
 		if not path_ in self.file_infos.keys():
 			dict_ = Queue()
@@ -1100,8 +1102,6 @@ class web_dwc2:
 		else:
 			fullpath = self.sdpath + file
 
-		self.file_infos['running_file'] = self.file_infos[fullpath]
-
 		#	load a file to scurrent_file if its none
 		if not self.sdcard.current_file:
 			if os.path.isfile(fullpath):
@@ -1115,6 +1115,8 @@ class web_dwc2:
 			else:
 				import pdb; pdb.set_trace()
 				raise 'gcodefile' + fullpath + ' not found'
+
+		self.file_infos['running_file'] = self.rr_fileinfo('knackwurst').result()
 
 		return 'M24'
 	#	rrf run macro
