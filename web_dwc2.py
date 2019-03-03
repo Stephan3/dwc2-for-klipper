@@ -489,6 +489,7 @@ class web_dwc2:
 			proc_ = Process(target=self.read_gcode, args=(path_,dict_))
 			proc_.start()
 			proc_.join(5)
+			#self.read_gcode(path_, {})
 			self.file_infos[path_] = dict_.get()
 
 		return self.file_infos[path_]
@@ -505,6 +506,7 @@ class web_dwc2:
 			'M32': self.cmd_M32 ,		#	Start sdprint
 			'M98': self.cmd_M98 ,		#	run macro
 			'M106': self.cmd_M106 ,		#	set fan
+			'M140': self.cmd_M140 ,		#	set bedtemp(limit to 0 mintemp)
 			'M290': self.cmd_M290 ,		#	set babysteps
 			'M999': self.cmd_M999		#	issue restart
 		}
@@ -1016,12 +1018,19 @@ class web_dwc2:
 				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos.get('running_file', {}).get('layercount', 1) ) * self.file_infos.get('running_file', {}).get('printTime', 1)
 			}
 		})
-		#	time left calc
-		#fkt_done = self.sdcard.get_status(now).get('progress', 0)
-		#file = ( 1 - fkt_done ) * self.print_data.get('print_dur', 1) / fkt_done
-		#filament = ( sum(self.file_infos.get('running_file', {}).get( "filament", 1)) - self.print_data['filament_used'] ) * \
-		#	self.print_data.get('print_dur', 1) / self.print_data['filament_used']
-		#layer = ( self.file_infos.get('running_file', {}).get('layercount', 1) - self.print_data.get('curr_layer', 1) ) * self.print_data.get('print_dur', 1) / self.print_data.get('curr_layer', 1)
+		# fileprogress
+		#done = self.sdcard.get_status(now).get('progress', 0)
+		#togo = 1 - done
+		#file = togo * self.print_data.get('print_dur', 1) / done
+		# filamnet
+		#done = self.print_data['filament_used']
+		#togo = sum(self.file_infos.get('running_file', {}).get( "filament", 1)) - self.print_data['filament_used']
+		#filament = togo * self.print_data.get('print_dur', 1) / done
+		# layers
+		#done = self.print_data.get('curr_layer', 1)
+		#togo = self.file_infos.get('running_file', {}).get('layercount', 1) - done
+		#layer = togo * self.print_data.get('print_dur', 1) / done
+
 		#self.status_3.update(
 		#		{ "timesLeft": { "file": file, "filament": filament, "layer": layer } }
 		#	)
@@ -1079,9 +1088,8 @@ class web_dwc2:
 	#	rrf G10 command - set heaterstemp
 	def cmd_G10(self, params):
 
-		tool = params['P']
-		temp = max(self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.))	#	not fully get this - John
-		command_ = str("M104 T%d S%0.2f" % (int(tool)-1,float(temp)))
+		temp = max ( max( self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.) ), 0 )
+		command_ = str("M104 T%d S%0.2f" % ( int(params['P'])-1, float(temp)) )
 		return command_
 	#	rrf M0 - cancel print from sd
 	def cmd_M0(self, params):
@@ -1161,6 +1169,12 @@ class web_dwc2:
 	#	fo ecxecuting m112 now!
 	def cmd_M112(self, params):
 		self.printer.invoke_shutdown('Emergency Stop from DWC 2')
+	#	set heatbed
+	def cmd_M140(self, params):
+
+		temp = max( self.gcode.get_float('S', params, 0.), 0)
+		command_ = str("M140 S%d" % ( int(temp)) )
+		return command_
 	#	setting babysteps:
 	def cmd_M290(self, params):
 
@@ -1561,32 +1575,31 @@ class web_dwc2:
 			if objects_h[sl] != "":
 				try:
 					matches = re.findall(objects_h[sl], pile )
-					meta['objects_h'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?	
+					meta['objects_h'] = max( [ float(mat_) for mat_ in re.findall("\d*\.\d*", ' '.join(matches) ) ] )
 				except:
 					pass				
 			if layer_h[sl] != "":
 				try:
 					matches = re.findall(layer_h[sl], pile )
-					meta['layer_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+					meta['layer_h'] = min( [ float(mat_) for mat_ in re.findall("\d*\.\d*", ' '.join(matches) ) ] )
 				except:
 					pass
 			if first_h[sl] != "":
 				try:
 					matches = re.findall(first_h[sl], pile )
-					meta['first_h'] = float( min( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # min strings works?
+					meta['first_h'] = min( [ float(mat_) for mat_ in re.findall("\d*\.\d*", ' '.join(matches) ) ] )
 				except:
 					pass
 			if time_e[sl] != "":
 				try:
 					matches = re.findall(time_e[sl], pile )
-					meta['time_e'] = max( matches )
-					meta['time_e'] = calc_time(meta['time_e'])	#	bring time to seconds
+					meta['time_e'] = calc_time(max( matches ))	#	bring time to seconds
 				except:
 					pass
 			if filament[sl] != "":
 				try:
 					matches = re.findall(filament[sl], pile )
-					meta['filament'] = float( max( re.findall("\d*\.\d*", ' '.join(matches) ) ) ) # max strings works?
+					meta['filament'] = max( [ float(mat_) for mat_ in re.findall("\d*\.\d*", ' '.join(matches) ) ] )
 					meta['filament'] = (meta['filament'],meta['filament']*1000)[sl==4]	#	cura is in m -> translate
 				except:
 					pass
