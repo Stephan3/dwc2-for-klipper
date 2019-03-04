@@ -23,6 +23,7 @@ A translator between DWC2 and Klipper
   * with mjpeg-streamer add the streaming url to settings. example: http://192.168.2.20:8080/?action=stream
   * With youtube live https://webcam.io/support/howto-embed-youtube-live/
 * pause/resume/cancel macros are working now - see Things you should know
+* plugin for Cura 4.0 does work, just enter url for example: http://192.168.2.188:4750/
 
 ## What is not working
 
@@ -33,7 +34,7 @@ A translator between DWC2 and Klipper
   * klipper does not have this feedback (yet)? due to its lookahead feature 
   * can we calc this? movelength/junction/acceleration is there
 * ~~cancel/pause/resume macros. I will do this soon~~
-* rrf/dwc cura plugin
+* ~~rrf/dwc cura plugin~~
 * ......
 
 ## Things you should know
