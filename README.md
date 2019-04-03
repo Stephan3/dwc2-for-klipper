@@ -88,7 +88,7 @@ echo "$gcode" > klipper/klippy/gcode.py
 
 mkdir -p ~/sdcard/dwc2/web
 cd ~/sdcard/dwc2/web 
-wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC5/DuetWebControl.zip
+wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC6/DuetWebControl.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 sudo systemctl start klipper
 ```
