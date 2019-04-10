@@ -1609,7 +1609,7 @@ class web_dwc2:
 
 		else:
 			if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and self.print_data['filament_used'] > 50 \
-					and max( self.print_data.get('last_zposes', [2]) ) / min( self.print_data.get('last_zposes', [1]) ) == 1 :
+					and min( self.print_data.get('last_zposes', [2]) ) / max( self.print_data.get('last_zposes', [1]) ) == 1 :
 
 				if self.print_data['firstlayer_dur'] == 0:
 					self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
