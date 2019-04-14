@@ -71,7 +71,7 @@ class web_dwc2:
 		self.status_1 = {}
 		self.status_2 = {}
 		self.status_3 = {}
-		self.current_tool = 99
+		self.current_tool = 0
 		self.dwc2()
 		logging.basicConfig(level=logging.DEBUG)
 	#	function once reactor calls, once klipper feels good
@@ -100,7 +100,6 @@ class web_dwc2:
 		#	registering command
 		self.gcode.register_command( 'M292', self.cmd_M292,
 			desc="okay button in DWC2")
-		self.current_tool = 0
 	#	reactor calls this on klippy restart
 	def shutdown(self):
 		#	kill the thread here
