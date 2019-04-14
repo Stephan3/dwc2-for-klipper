@@ -99,7 +99,6 @@ class web_dwc2:
 		#	registering command
 		self.gcode.register_command( 'M292', self.cmd_M292,
 			desc="okay button in DWC2")
-		self.current_tool
 	#	reactor calls this on klippy restart
 	def shutdown(self):
 		#	kill the thread here
@@ -529,11 +528,6 @@ class web_dwc2:
 			#	defaulting to original
 			handover = params['#original']
 
-			#	handle toolchanges
-			if re.match('^T\d$', params['#command']):
-				self.current_tool = params['T']
-				continue
-
 			#	prevent midprint accidents
 			stat_ = self.get_printer_status()
 			if stat_ in [ 'P', 'D', 'R' ] and params['#command'] not in midprint_allow :
@@ -660,7 +654,7 @@ class web_dwc2:
 				"requested": gcode_stats['speed'] / 60 * gcode_stats['speed_factor'] ,
 				"top": 	0 #	not available on klipepr
 			},
-			"currentTool": self.current_tool,	#	must be at least 1 ! learned the hardway....
+			"currentTool": 1,	#	must be at least 1 ! learned the hardway....
 			"params": {
 				"atxPower": 0,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
@@ -766,7 +760,7 @@ class web_dwc2:
 				"requested": gcode_stats['speed'] / 60 * gcode_stats['speed_factor'] ,
 				"top": 	0 #	not available on klipepr
 			},
-			"currentTool": self.current_tool ,
+			"currentTool": 1 ,
 			"params": {
 				"atxPower": 0 ,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
@@ -808,11 +802,11 @@ class web_dwc2:
 				]
 			},
 			"time": time.time() - self.start_time,
-			"coldExtrudeTemp": max( [ ex_.get('min_extrude_temp', 0) for ex_ in extr_stat ], 0 ),
-			"coldRetractTemp": max( [ ex_.get('min_extrude_temp', 0) for ex_ in extr_stat ], 0 ),
+			"coldExtrudeTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] ),
+			"coldRetractTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] ),
 			"compensation": "None",
 			"controllableFans": len( fan_stats ),
-			"tempLimit": max( [ ex_.get('max_temp', 0) for ex_ in extr_stat ], 200 ),
+			"tempLimit": max( ex_['max_temp'] for ex_ in extr_stat ),
 			"endstops": 4088,	#	what does this do?
 			"firmwareName": "Klipper",
 			"geometry": self.kin_name,
@@ -972,7 +966,7 @@ class web_dwc2:
 				"requested": gcode_stats['speed'] / 60 * gcode_stats['speed_factor'] ,
 				"top": 	0 #	not available on klipepr
 			},
-			"currentTool": self.current_tool ,
+			"currentTool": 1 ,
 			"params": {
 				"atxPower": 0 ,
 				"fanPercent": [ fan_['speed']*100 for fan_ in fan_stats ] ,
@@ -1223,7 +1217,10 @@ class web_dwc2:
 	def gcode_response(self, msg):
 		
 		if self.klipper_ready:
-			if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
+			stat_ = self.get_printer_status()
+			if stat_ in [ 'S', 'P', 'D', 'B' ]:
+				#SPD? seriously? printing state
+				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
 
 		self.gcode_reply.append(msg)
 	#	recall for gcode ecxecution is needed ( threadsafeness )
@@ -1232,7 +1229,11 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
+<<<<<<< HEAD
 		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M117", "M140", "M141", "FIRMWARE_RESTART" "", "SET_PIN", "STEPPER_BUZZ" ]
+=======
+		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "", "SET_PIN", "STEPPER_BUZZ" ]
+>>>>>>> parent of 9d04068... Adds support for toolselection. Therby multitoolsupport should work and manual retraction and extruding also.
 		lowers = [ "DUMP_TMC", "ENDSTOP_PHASE_CALIBRATE", "FORCE_MOVE", "PID_CALIBRATE", "SET_HEATER_TEMPERATURE", "SET_PIN", "SET_PRESSURE_ADVANCE", "STEPPER_BUZZ" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
@@ -1251,6 +1252,8 @@ class web_dwc2:
 			except Exception as e:
 				self.gcode_reply.append( "" )
 				logging.error( "failed: " + params['#command'] + str(e) )
+				#self.set_popup(msg=params['#command'] + ' resulted with: ' + str(e))
+				#self.set_message(msg="Warning: " + params['#command'] + ' resulted with: ' + str(e))
 				time.sleep(1)	#	not beautiful but webif ignores errors on button commands otherwise
 				self.gcode_reply.append( "!! " + str(e) + "\n" )
 			else:
