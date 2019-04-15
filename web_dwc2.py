@@ -1217,10 +1217,7 @@ class web_dwc2:
 	def gcode_response(self, msg):
 		
 		if self.klipper_ready:
-			stat_ = self.get_printer_status()
-			if stat_ in [ 'S', 'P', 'D', 'B' ]:
-				#SPD? seriously? printing state
-				if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters temmessages during heatup
+			if re.match('T\d:\d+.\d\s/\d+.\d+', msg): return	#	filters tempmessages during heatup
 
 		self.gcode_reply.append(msg)
 	#	recall for gcode ecxecution is needed ( threadsafeness )
@@ -1229,11 +1226,7 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-<<<<<<< HEAD
 		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M117", "M140", "M141", "FIRMWARE_RESTART" "", "SET_PIN", "STEPPER_BUZZ" ]
-=======
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M140", "M141", "", "SET_PIN", "STEPPER_BUZZ" ]
->>>>>>> parent of 9d04068... Adds support for toolselection. Therby multitoolsupport should work and manual retraction and extruding also.
 		lowers = [ "DUMP_TMC", "ENDSTOP_PHASE_CALIBRATE", "FORCE_MOVE", "PID_CALIBRATE", "SET_HEATER_TEMPERATURE", "SET_PIN", "SET_PRESSURE_ADVANCE", "STEPPER_BUZZ" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
