@@ -57,6 +57,7 @@ class web_dwc2:
 		#	grab stuff from config file
 		self.klipper_config = self.printer.get_start_args()['config_file']
 		self.sdpath = self.configfile.getsection("virtual_sdcard").get("path", None)
+		self.sdpath = os.path.normpath(os.path.expanduser(self.sdpath))
 		if not self.sdpath:
 			logging.error( "DWC2 failed to start, no sdcard configured" )
 			return
