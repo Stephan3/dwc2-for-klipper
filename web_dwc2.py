@@ -803,11 +803,11 @@ class web_dwc2:
 				]
 			},
 			"time": time.time() - self.start_time,
-			"coldExtrudeTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] ),
-			"coldRetractTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] ),
+			"coldExtrudeTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] + [0] ),
+			"coldRetractTemp": max( [ ex_['min_extrude_temp'] for ex_ in extr_stat ] + [0] ),
 			"compensation": "None",
 			"controllableFans": len( fan_stats ),
-			"tempLimit": max( ex_['max_temp'] for ex_ in extr_stat ),
+			"tempLimit": max( [ ex_['max_temp'] for ex_ in extr_stat ] + [0] ),
 			"endstops": 4088,	#	what does this do?
 			"firmwareName": "Klipper",
 			"geometry": self.kin_name,
