@@ -185,8 +185,9 @@ class web_dwc2:
 		@tornado.gen.coroutine
 		def get(self, *args):
 
-			if self.request.remote_ip not in self.web_dwc2.sessions.keys() and "rr_connect" not in self.request.uri:
-				#	response 408 timeout to make the webif reload after klippy restarts us
+			if self.request.remote_ip not in self.web_dwc2.sessions.keys() and "rr_connect" not in self.request.uri and self.request.remote_ip != '127.0.0.1':
+				#	response 408 timeout to force the webif reload after klippy restarts us
+				logging.error( self.request.remote_ip )
 				self.clear()
 				self.set_status(408)
 				self.finish()
