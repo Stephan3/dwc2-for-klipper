@@ -284,6 +284,9 @@ class web_dwc2:
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
 
+		def decode_argument(self, value, name=None):
+			return value.encode('UTF-8') if isinstance(value, unicode) else value
+
 ##
 #	All the crazy shit dc42 fiddled together in c
 ##
@@ -445,7 +448,7 @@ class web_dwc2:
 
 		#	append elements to files list matching rrf syntax
 		for el_ in os.listdir(path_):
-			el_path = path_ + "/" + el_
+			el_path = path_ + "/" + str(el_)
 			repl_['files'].append({
 				"type": "d" if os.path.isdir(el_path) else "f" ,
 				"name": str(el_) ,
