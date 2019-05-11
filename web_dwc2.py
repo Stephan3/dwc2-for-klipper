@@ -539,7 +539,7 @@ class web_dwc2:
 				if handover == 0:
 					self.gcode_reply.append("ok\n")
 
-			#	if we set things directly in klipper we dond need to pipe gcodes
+			#	if we set things directly in klipper we don´t need to pipe gcodes
 			if handover:
 				self.gcode_queue.append(handover)
 
