@@ -1463,7 +1463,7 @@ class web_dwc2:
 			]
 		#	slicers filament usage
 		filament = [
-			'Ext 1 =.*mm' ,									#	Kisslicer
+			'Ext.*=.*mm' ,									#	Kisslicer
 			';.*filament used =' ,							#	Slic3r
 			';.*Filament length: \d+.*\(' ,					#	S3d
 			'.*filament\sused\s=\s.*mm' ,					#	Slic3r PE ; filament used =
