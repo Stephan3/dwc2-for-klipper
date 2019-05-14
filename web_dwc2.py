@@ -107,6 +107,7 @@ class web_dwc2:
 	def shutdown(self):
 		#	kill the thread here
 		logging.info( "DWC2 shuting down - as klippy is shutdown" )
+		self.ioloop.stop()
 		self.http_server.stop()
 		self.sessions = {}
 
@@ -126,7 +127,8 @@ class web_dwc2:
 			logging.info( "DWC2 starting at: http://" + str(self.adress) + ":" + str(self.port) )
 			self.http_server = tornado.httpserver.HTTPServer( application, max_buffer_size=500*1024*1024 )
 			self.http_server.listen( self.port )
-			tornado.ioloop.IOLoop.instance().start()
+			self.ioloop = tornado.ioloop.IOLoop.current()
+			self.ioloop.start()
 		def debug_console(self):
 			logging.debug( "Start debbug console:\n")
 			import pdb; pdb.set_trace()
