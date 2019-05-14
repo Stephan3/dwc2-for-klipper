@@ -19,6 +19,7 @@ import util
 import shutil
 import serial
 
+#
 class web_dwc2:
 
 ##
@@ -73,6 +74,7 @@ class web_dwc2:
 		self.status_1 = {}
 		self.status_2 = {}
 		self.status_3 = {}
+		self.file_infos = {}			#	just read files once
 		self.dwc2()
 		logging.basicConfig(level=logging.DEBUG)
 	#	function once reactor calls, once klipper feels good
@@ -96,7 +98,6 @@ class web_dwc2:
 
 		# 	print data for tracking layers during print
 		self.print_data = {}			#	printdata/layertimes etc
-		self.file_infos = {}			#	just read files once
 		self.klipper_ready = True
 		self.get_klipper_macros()
 		#	registering command
@@ -389,26 +390,7 @@ class web_dwc2:
 			return {"err":1}
 	#	dwc rr_files - dwc1 thing
 	def rr_files(self, web_):
-		#		{
-		#			"dir":"0:/gcodes",
-		#			"first":0,
-		#			"files":[
-		#				"testcube.gcode",
-		#				"Hevo",
-		#				"xy_joint_backbrace_left.gcode",
-		#				"VORON",
-		#				"Calibration",
-		#				"Hevo_Fusion",
-		#				"blabla",
-		#				"3D_Scanner",
-		#				"Alex",
-		#				"Hevo_Reinforced",
-		#				"snurk_ring_2cm_Type1-_V2.gcode",
-		#				"*Hevo_RS",
-		#				"Fucktopus_easy.gcode"],
-		#			"next":0,
-		#			"err":0
-		#		}
+
 		path_ = self.sdpath + web_.get_argument('dir').replace("0:", "")
 
 		repl_ = {
@@ -495,7 +477,6 @@ class web_dwc2:
 			proc_ = Process(target=self.read_gcode, args=(path_,dict_))
 			proc_.start()
 			proc_.join(5)
-			#self.read_gcode(path_, {})
 			self.file_infos[path_] = dict_.get()
 
 		return self.file_infos[path_]
@@ -554,9 +535,11 @@ class web_dwc2:
 				handover = func_(params)
 				if handover == 0:
 					self.gcode_reply.append("ok\n")
-					continue
 
-			self.gcode_queue.append(handover)
+			#	if we set things directly in klipper we dond need to pipe gcodes
+			if handover:
+				self.gcode_queue.append(handover)
+
 		web_.write( json.dumps({'buff': 1, 'err': 0}) )
 		web_.finish()
 		self.reactor.register_callback(self.gcode_reactor_callback)
@@ -895,59 +878,6 @@ class web_dwc2:
 				})
 	#	dwc rr_status 3
 	def rr_status_3(self):
-		#	nested here as its related to fileinfo_3 only
-		def manage_print_data():
-
-			#	init print data on started print
-			if not self.print_data:
-
-				self.print_data = {
-					"print_start": time.time() ,
-					"print_dur": 0 ,
-					"extr_start": sum(self.toolhead.get_position()[3:]) ,
-					"firstlayer_dur": 0 ,
-					"curr_layer": 1 ,
-					"curr_layer_start": 0 ,
-					"curr_layer_dur" : 0 ,
-					"heat_time": 0 ,
-					"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(10) ] ,
-					"last_switch_z": 0,
-				}
-
-			#	first out, actual in - a rolling list
-			self.print_data['last_zposes'].pop(0)
-			self.print_data['last_zposes'].append(gcode_stats['last_zpos'])
-			self.print_data['filament_used'] = max( sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start'], 1)
-
-			if self.print_data['curr_layer_start'] == 0 \
-					and self.print_data['filament_used'] > 50:
-				#	now we know firstlayer started + heating ended
-				self.print_data.update({
-					'curr_layer_start': time.time() ,
-					'heat_time': time.time() - self.print_data.get('print_start', 0) ,
-					'last_switch_z': gcode_stats['last_zpos']
-					})
-
-			else:
-				if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and self.print_data['filament_used'] > 50 \
-						and max( self.print_data.get('last_zposes', [2]) ) / min( self.print_data.get('last_zposes', [1]) ) == 1 :
-
-					if self.print_data['firstlayer_dur'] == 0:
-						self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
-					self.print_data.update({
-						'curr_layer_start': time.time() ,
-						'curr_layer_dur': 0 ,
-						'curr_layer': self.print_data['curr_layer'] + 1 ,
-						'last_switch_z': gcode_stats['last_zpos']
-						})
-
-
-			if self.print_data['curr_layer_start'] == 0:
-				self.print_data['curr_layer_dur'] = 0
-			else:
-				self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
-
-			self.print_data['print_dur'] = time.time() - self.print_data['print_start']
 
 		if self.status_3.get("output", {}).get("message", None) :
 			self.status_3.update({ "output": {} })
@@ -963,8 +893,6 @@ class web_dwc2:
 			fan_stats = [ self.fan.get_status(now) ]	#	this can be better
 		else:
 			fan_stats = []
-
-		manage_print_data()
 
 		self.status_3.update({
 			"status": self.get_printer_status() ,
@@ -1024,28 +952,11 @@ class web_dwc2:
 			"printDuration": self.print_data.get('print_dur', 1) ,
 			"warmUpDuration": self.print_data.get('heat_time', 1),
 			"timesLeft": {
-				"file": (1-self.sdcard.get_status(now).get('progress', 0)) * self.file_infos.get('running_file',{}).get('printTime', 1),
-				"filament": (1-( sum(self.toolhead.get_position()[3:]) - self.print_data.get("extr_start", 1) ) \
-								/ sum(self.file_infos.get('running_file', {}).get( "filament", 1) ) ) * self.file_infos.get('running_file', {}).get('printTime', 1),
-				"layer": (1-self.print_data.get('curr_layer', 1) / self.file_infos.get('running_file', {}).get('layercount', 1) ) * self.file_infos.get('running_file', {}).get('printTime', 1)
+				"file": self.print_data['tleft_file'],
+				"filament": self.print_data['tleft_filament'],
+				"layer": self.print_data['tleft_layer']
 			}
 		})
-		# fileprogress
-		#done = self.sdcard.get_status(now).get('progress', 0)
-		#togo = 1 - done
-		#file = togo * self.print_data.get('print_dur', 1) / done
-		# filamnet
-		#done = self.print_data['filament_used']
-		#togo = sum(self.file_infos.get('running_file', {}).get( "filament", 1)) - self.print_data['filament_used']
-		#filament = togo * self.print_data.get('print_dur', 1) / done
-		# layers
-		#done = self.print_data.get('curr_layer', 1)
-		#togo = self.file_infos.get('running_file', {}).get('layercount', 1) - done
-		#layer = togo * self.print_data.get('print_dur', 1) / done
-
-		#self.status_3.update(
-		#		{ "timesLeft": { "file": file, "filament": filament, "layer": layer } }
-		#	)
 
 		if self.message:
 			self.status_3.update(
@@ -1118,7 +1029,27 @@ class web_dwc2:
 	def cmd_M24(self, params):
 		if self.sdcard.file_position > 0:
 			self.resume_macro()
-		return "M24"
+		else:
+			self.print_data = {
+				"print_start": time.time() ,
+				"print_dur": 0 ,
+				"extr_start": sum(self.toolhead.get_position()[3:]) ,
+				"firstlayer_dur": 0 ,
+				"curr_layer": 1 ,
+				"curr_layer_start": 0 ,
+				"curr_layer_dur" : 0 ,
+				"heat_time": 0 ,
+				"last_zposes": [ self.toolhead.get_position()[3] for n_ in range(10) ] ,
+				"last_switch_z": 0,
+				"tleft_file": 99999999999,
+				"tleft_filament": 99999999999,
+				"tleft_layer": 99999999999,
+				"layercount": self.file_infos.get('running_file', {}).get('layercount', 1),
+				"filament": self.file_infos.get('running_file', {}).get( "filament", 1)
+			}
+			self.reactor.register_callback(self.update_printdata, waketime=self.reactor.monotonic() + 2)
+		self.sdcard.cmd_M24(params)
+		return 0
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
@@ -1140,14 +1071,12 @@ class web_dwc2:
 				self.sdcard.current_file = self.printfile 								#	set it as current file
 				self.sdcard.file_position = 0 											#	postions / size
 				self.sdcard.file_size = os.stat(fullpath).st_size
-				self.print_data = None 													#	reset printdata as this is a new print
 			else:
 				import pdb; pdb.set_trace()
 				raise 'gcodefile' + fullpath + ' not found'
 
 		self.file_infos['running_file'] = self.rr_fileinfo('knackwurst').result()
-
-		return 'M24'
+		return self.cmd_M24(params)
 	#	rrf run macro
 	def cmd_M98(self, params):
 
@@ -1287,6 +1216,7 @@ class web_dwc2:
 			self.reactor.register_callback(self.gcode_reactor_callback)
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line, low_=False):
+		logging.error(line)
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
 		if low_:
 			line = origline = line.strip().lower()
@@ -1651,7 +1581,61 @@ class web_dwc2:
 					}
 				} # ok is M292
 			}
-	#	helpful if you mussed something in status 0-3
+	#	permanent loop if we are in printing state
+	def update_printdata(self, eventtime):
+		if self.get_printer_status() in ['S', 'P', 'D']:
+			self.reactor.register_callback(self.update_printdata, waketime=self.reactor.monotonic() + 0.6)
+		else:
+			return
+		now = self.reactor.monotonic()
+
+		gcode_stats = self.gcode.get_status(now)
+		#	first out, actual in - a rolling list
+		self.print_data['last_zposes'].pop(0)
+		self.print_data['last_zposes'].append(gcode_stats['last_zpos'])
+		self.print_data['filament_used'] = max( sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start'], 1)
+
+		if self.print_data['curr_layer_start'] == 0 \
+				and self.print_data['filament_used'] > 50:
+			#	now we know firstlayer started + heating ended
+			self.print_data.update({
+				'curr_layer_start': time.time() ,
+				'heat_time': time.time() - self.print_data.get('print_start', 0) ,
+				'last_switch_z': gcode_stats['last_zpos']
+				})
+
+		else:
+			if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and self.print_data['filament_used'] > 50 \
+					and max( self.print_data.get('last_zposes', [2]) ) / min( self.print_data.get('last_zposes', [1]) ) == 1 :
+
+				if self.print_data['firstlayer_dur'] == 0:
+					self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
+				self.print_data.update({
+					'curr_layer_start': time.time() ,
+					'curr_layer_dur': 0 ,
+					'curr_layer': self.print_data['curr_layer'] + 1 ,
+					'last_switch_z': gcode_stats['last_zpos']
+					})
+
+
+		if self.print_data['curr_layer_start'] == 0:
+			self.print_data['curr_layer_dur'] = 0
+		else:
+			self.print_data['curr_layer_dur'] = time.time() - self.print_data['curr_layer_start']
+
+		self.print_data['print_dur'] = time.time() - self.print_data['print_start']
+		#	timeleft calc
+		passed = self.print_data['print_dur']
+		file_done = self.sdcard.get_status(now).get('progress', 0)
+		self.print_data['tleft_file'] = (1-file_done) * passed / file_done
+		#
+		layer_done = self.print_data['curr_layer']
+		self.print_data['tleft_layer'] = ( self.print_data['layercount'] - layer_done ) * passed / layer_done
+		#
+		f_need = sum(self.print_data['filament'])
+		f_used = sum(self.toolhead.get_position()[3:])
+		self.print_data['tleft_filament'] = ( f_need - f_used ) * passed / f_used
+
 	def dict_compare(self, d1, d2):
 
 		#	self.dict_compare( self.status_1 , self.status_2 )
