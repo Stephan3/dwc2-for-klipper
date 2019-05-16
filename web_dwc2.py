@@ -1628,16 +1628,16 @@ class web_dwc2:
 
 		self.print_data['print_dur'] = time.time() - self.print_data['print_start']
 		#	timeleft calc
-		passed = self.print_data['print_dur']
+		t_elapsed = self.print_data['print_dur']
 		file_done = self.sdcard.get_status(now).get('progress', 0)
-		self.print_data['tleft_file'] = (1-file_done) * passed / max(.1, file_done)
+		self.print_data['tleft_file'] = (1-file_done) * t_elapsed / max(.0001, file_done)
 		#
 		layer_done = self.print_data['curr_layer']
-		self.print_data['tleft_layer'] = ( self.print_data['layercount'] - layer_done ) * passed / layer_done
+		self.print_data['tleft_layer'] = ( self.print_data['layercount'] - layer_done ) * t_elapsed / layer_done
 		#
 		f_need = sum(self.print_data['filament'])
-		f_used = sum(self.toolhead.get_position()[3:])
-		self.print_data['tleft_filament'] = ( f_need - f_used ) * passed / f_used
+		f_used = sum(self.toolhead.get_position()[3:] - print_data['extr_start'] )
+		self.print_data['tleft_filament'] = ( f_need - f_used ) * t_elapsed / f_used
 
 	def dict_compare(self, d1, d2):
 
@@ -1649,7 +1649,7 @@ class web_dwc2:
 				print( key_ + " is different in d2.:\nd1:")
 				print( json.dumps(d1.get(key_)) )
 				print("vs d2 :")
-				print(json.dumps(d2.get(key_)))
+				print( json.dumps(d2.get(key_)) )
 				print("\n")
 
 def load_config(config):
