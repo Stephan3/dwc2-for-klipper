@@ -1630,7 +1630,7 @@ class web_dwc2:
 		#	timeleft calc
 		passed = self.print_data['print_dur']
 		file_done = self.sdcard.get_status(now).get('progress', 0)
-		self.print_data['tleft_file'] = (1-file_done) * passed / file_done
+		self.print_data['tleft_file'] = (1-file_done) * passed / max(.1, file_done)
 		#
 		layer_done = self.print_data['curr_layer']
 		self.print_data['tleft_layer'] = ( self.print_data['layercount'] - layer_done ) * passed / layer_done
