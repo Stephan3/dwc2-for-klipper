@@ -1636,7 +1636,7 @@ class web_dwc2:
 		self.print_data['tleft_layer'] = ( self.print_data['layercount'] - layer_done ) * t_elapsed / layer_done
 		#
 		f_need = sum(self.print_data['filament'])
-		f_used = sum(self.toolhead.get_position()[3:] - print_data['extr_start'] )
+		f_used = max( sum(self.toolhead.get_position()[3:]) - self.print_data['extr_start'], 1)
 		self.print_data['tleft_filament'] = ( f_need - f_used ) * t_elapsed / f_used
 
 	def dict_compare(self, d1, d2):
