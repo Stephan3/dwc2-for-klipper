@@ -1170,7 +1170,7 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M117", "M140", "M141", "DUMP_TMC", "FIRMWARE_RESTART" "", "SET_PIN", "STEPPER_BUZZ" ]
+		ack_needers = [ "G0", "G1", "G28", "G90", "G91", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M117", "M140", "M141", "DUMP_TMC", "FIRMWARE_RESTART" "", "SET_PIN", "STEPPER_BUZZ" ]
 		lowers = [ "DUMP_TMC", "ENDSTOP_PHASE_CALIBRATE", "FORCE_MOVE", "PID_CALIBRATE", "SET_HEATER_TEMPERATURE", "SET_PIN", "SET_PRESSURE_ADVANCE", "STEPPER_BUZZ" ]
 
 		self.gcode.dwc_lock = self.gcode.is_processing_data = True
