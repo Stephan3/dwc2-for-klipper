@@ -1469,7 +1469,7 @@ class web_dwc2:
 			'.*filament\sused\s=\s.*mm' ,					#	Slic3r PE ; filament used =
 			';Filament used: \d*.\d+m'	,					#	Cura
 			';Material#1 Used:\s\d+\.?\d+',					#	ideamaker
-			'.*filament\sused\s=\s.*mm'						#	PrusaSlicer
+			'.*filament\sused\s.mm.\s=\s[0-9\.]+'					#	PrusaSlicer
 			]
 		#	slicernames
 		slicers = [ 
