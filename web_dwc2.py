@@ -1136,7 +1136,7 @@ class web_dwc2:
 
 		mm_step = self.gcode.get_float('Z', params, None)
 		if not mm_step: mm_step = self.gcode.get_float('S', params, None)	#	DWC 1 workarround
-		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST%0.2f MOVE=1' % mm_step)
+		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST' + str(mm_step) + ' MOVE1')
 		self.gcode.cmd_SET_GCODE_OFFSET(params)
 		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
 
@@ -1624,7 +1624,7 @@ class web_dwc2:
 
 		else:
 			if self.print_data['last_switch_z'] != gcode_stats['last_zpos'] and self.print_data['filament_used'] > 50 \
-					and min( self.print_data.get('last_zposes', [2]) ) / max( self.print_data.get('last_zposes', [1]) ) == 1 :
+					and (min( self.print_data.get('last_zposes', [2]) )+1) / (max( self.print_data.get('last_zposes', [1]) )+1) == 1 :
 
 				if self.print_data['firstlayer_dur'] == 0:
 					self.print_data['firstlayer_dur'] = self.print_data['curr_layer_dur']
