@@ -89,12 +89,11 @@ class web_dwc2:
 		self.sdcard = self.printer.lookup_object('virtual_sdcard', None)
 		self.toolhead = self.printer.lookup_object('toolhead', None)
 		#	hopeflly noone get more than 4 extruders up :D
-		self.extruders = [
-			self.printer.lookup_object('extruder', None) ,
-			self.printer.lookup_object('extruder1', None) ,
-			self.printer.lookup_object('extruder2', None) ,
-			self.printer.lookup_object('extruder3', None)
-		]
+		self.extruders = [ self.printer.lookup_object('extruder', None) ]
+		for i in range(1,10):
+			app = self.printer.lookup_object('extruder%d' % (i,), None)
+			if app:
+				self.extruders.append(app)
 		self.kinematics = self.toolhead.get_kinematics()
 
 		# 	print data for tracking layers during print
