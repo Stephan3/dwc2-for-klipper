@@ -495,6 +495,8 @@ class web_dwc2:
 			'M32': self.cmd_M32 ,		#	Start sdprint
 			'M98': self.cmd_M98 ,		#	run macro
 			'M106': self.cmd_M106 ,		#	set fan
+			'M120': self.cmd_M120 ,		#	save gcode state
+			'M121': self.cmd_M121 ,		#	restore gcode state
 			'M140': self.cmd_M140 ,		#	set bedtemp(limit to 0 mintemp)
 			'M290': self.cmd_M290 ,		#	set babysteps
 			'M999': self.cmd_M999		#	issue restart
@@ -1113,6 +1115,12 @@ class web_dwc2:
 	#	fo ecxecuting m112 now!
 	def cmd_M112(self, params):
 		self.printer.invoke_shutdown('Emergency Stop from DWC 2')
+	#	save states butttons
+	def cmd_M120(self, params):
+		return "SAVE_GCODE_STATE NAME=DWC_BOTTON"
+	#	restore states butttons
+	def cmd_M121(self, params):
+		return "RESTORE_GCODE_STATE NAME=DWC_BOTTON MOVE=0"
 	#	set heatbed
 	def cmd_M140(self, params):
 
