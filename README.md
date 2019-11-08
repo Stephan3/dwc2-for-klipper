@@ -96,8 +96,8 @@ sudo systemctl start klipper
 ##### if you want backwards compatibility to dwc 1:
 ```
 cd ~/sdcard/dwc2/web 
-wget https://github.com/chrishamm/DuetWebControl/releases/download/1.22.5/DuetWebControl-1.22.5.zip
-unzip DuetWebControl-1.22.5.zip
+wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.4/DuetWebControl-SD.zip
+unzip DuetWebContro*.zip
 for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 ```
 
