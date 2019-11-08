@@ -501,8 +501,8 @@ class web_dwc2:
 		}
 
 		#	allow - set heater, cancelprint, set bed, ,pause, resume, set fan, set speedfactor, set extrusion multipler, babystep, ok in popup
-		midprint_allow = [ 'DUMP_TMC', 'G10', 'GET_POSITION', 'HELP', 'M0', 'M140', 'M24', 'M25', 'M106', 'M220', 'M221', 'M290', 'M292', 'QUERY_FILAMENT_SENSOR', 'SET_TMC_CURRENT', 'SET_PIN',
-				'SET_PRESSURE_ADVANCE', 'SET_VELOCITY_LIMIT' ]
+		midprint_allow = [ 'DUMP_TMC', 'G10', 'GET_POSITION', 'HELP', 'M0', 'M140', 'M24', 'M25', 'M104', 'M106', 'M107', 'M112', 'M114', 'M115', 'M140', 'M204', 'M220', 'M221', 'M290', 'M292', 'QUERY_FILAMENT_SENSOR', 'SET_TMC_CURRENT', 'SET_PIN',
+				'SET_PRESSURE_ADVANCE', 'SET_VELOCITY_LIMIT', 'T' ]
 
 		#	Handle emergencys - just do it now
 		for code in gcodes:
@@ -1128,7 +1128,7 @@ class web_dwc2:
 
 		mm_step = self.gcode.get_float('Z', params, None)
 		if not mm_step: mm_step = self.gcode.get_float('S', params, None)	#	DWC 1 workarround
-		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST%0.2f' % mm_step)
+		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST%0.2f MOVE=1' % mm_step)
 		self.gcode.cmd_SET_GCODE_OFFSET(params)
 		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
 
