@@ -89,7 +89,7 @@ class web_dwc2:
 		self.toolhead = self.printer.lookup_object('toolhead', None)
 		#	hopeflly noone get more than 4 extruders up :D
 		self.extruders = [
-			self.printer.lookup_object('extruder0', None) ,
+			self.printer.lookup_object('extruder', None) ,
 			self.printer.lookup_object('extruder1', None) ,
 			self.printer.lookup_object('extruder2', None) ,
 			self.printer.lookup_object('extruder3', None)
