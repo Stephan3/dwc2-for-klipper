@@ -46,6 +46,7 @@ class web_dwc2:
 		self.reactor = self.printer.get_reactor()
 		self.gcode = self.printer.lookup_object('gcode')
 		self.configfile = self.printer.lookup_object('configfile').read_main_config()
+		self.stepper_enable = self.printer.try_load_module(config, "stepper_enable")
 		#	gcode execution needs
 		self.gcode_queue = []	#	containing gcode user pushes from dwc2
 		self.gcode_reply = []	#	contains the klippy replys
@@ -1359,9 +1360,10 @@ class web_dwc2:
 	def get_axes_homed(self):
 		#	self.toolhead.get_next_move_time() - self.reactor.monotonic()
 		homed = []
-		for rail in self.kinematics.rails:
+		stepper_names = [s.get_name() for s in self.kinematics.get_steppers()]
+		for name in stepper_names:
 
-			if rail.is_motor_enabled():
+			if self.stepper_enable.lookup_enable(name).is_motor_enabled():
 				homed.append(1)
 			else:
 				homed.append(0)
