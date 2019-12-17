@@ -1393,7 +1393,7 @@ class web_dwc2:
 
 				app_ = {
 					'name': re.sub('\d', '', ex_.name) + str( self.extruders.index(ex_) ) ,
-					'pos': ex_.extrude_pos.stepper.get_commanded_position() ,
+					'pos': ex_.stepper.get_commanded_position() ,
 					'actual': status['temperature'] ,
 					'target': status['target'] ,
 					'state': 0 if status['target'] < 20 else 2 ,
