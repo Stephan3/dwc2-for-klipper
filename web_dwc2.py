@@ -547,7 +547,7 @@ class web_dwc2:
 
 		web_.write( json.dumps({'buff': 1, 'err': 0}) )
 		web_.finish()
-		self.reactor.register_callback(self.gcode_reactor_callback)
+		self.reactor.register_async_callback(self.gcode_reactor_callback)
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
 
@@ -1164,7 +1164,7 @@ class web_dwc2:
 			self.gcode_queue.append('CANCEL_PRINT')
 
 		if self.gcode_queue:
-			self.reactor.register_callback(self.gcode_reactor_callback)
+			self.reactor.register_async_callback(self.gcode_reactor_callback)
 	#	getting response by callback
 	def gcode_response(self, msg):
 		
@@ -1224,7 +1224,7 @@ class web_dwc2:
 			self.gcode_queue.append('PAUSE_PRINT')
 
 		if self.gcode_queue:
-			self.reactor.register_callback(self.gcode_reactor_callback)
+			self.reactor.register_async_callback(self.gcode_reactor_callback)
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line, low_=False):
 		logging.error(line)
@@ -1267,7 +1267,7 @@ class web_dwc2:
 			self.gcode_queue.append('RESUME_PRINT')
 
 		if self.gcode_queue:
-			self.reactor.register_callback(self.gcode_reactor_callback)
+			self.reactor.register_async_callback(self.gcode_reactor_callback)
 ##
 #	Helper functions getting/parsing data
 ##
