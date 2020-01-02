@@ -503,7 +503,7 @@ class web_dwc2:
 		}
 
 		#	allow - set heater, cancelprint, set bed, ,pause, resume, set fan, set speedfactor, set extrusion multipler, babystep, ok in popup
-		midprint_allow = [ 'DUMP_TMC', 'G10', 'GET_POSITION', 'HELP', 'M0', 'M140', 'M24', 'M25', 'M104', 'M106', 'M107', 'M112', 'M114', 'M115', 'M140', 'M204', 'M220', 'M221', 'M290', 'M292', 'QUERY_FILAMENT_SENSOR', 'SET_TMC_CURRENT', 'SET_PIN',
+		midprint_allow = [ 'DUMP_TMC', 'G10', 'GET_POSITION', 'HELP', 'M0', 'M140', 'M24', 'M25', 'M104', 'M106', 'M107', 'M112', 'M114', 'M115', 'M140', 'M204', 'M220', 'M221', 'M290', 'M292', 'QUERY_FILAMENT_SENSOR', 'SET_GCODE_OFFSET', 'SET_TMC_CURRENT', 'SET_PIN',
 				'SET_PRESSURE_ADVANCE', 'SET_VELOCITY_LIMIT', 'T' ]
 
 		#	Handle emergencys - just do it now
@@ -1135,12 +1135,19 @@ class web_dwc2:
 			return 0
 
 		mm_step = self.gcode.get_float('Z', params, None)
-		if not mm_step: mm_step = self.gcode.get_float('S', params, None)	#	DWC 1 workarround
-		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST' + str(mm_step) + ' MOVE1')
-		self.gcode.cmd_SET_GCODE_OFFSET(params)
-		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
+		if not mm_step: mm_step = self.gcode.get_float('S', params, None)			#	DWC 1 workarround
+		
+		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST' + str(mm_step) + ' MOVE1')	#	acces in idle
+		command_ = 'SET_GCODE_OFFSET Z_ADJUST=' + str(mm_step) + ' MOVE=1'			#	command middprint
+		
+		stat_ = self.get_printer_status()
+		if stat_ in [ 'P', 'D', 'R' ]:
+			return command_
+		else:
+			self.gcode.cmd_SET_GCODE_OFFSET(params)
+			self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
+			return 0
 
-		return 0
 	#	Ok button in DWC webif
 	def cmd_M292(self, params):
 		self.popup = None
