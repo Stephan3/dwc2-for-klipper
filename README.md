@@ -88,7 +88,7 @@ echo "$gcode" > klipper/klippy/gcode.py
 
 mkdir -p ~/sdcard/dwc2/web
 cd ~/sdcard/dwc2/web 
-wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.0-RC6/DuetWebControl.zip
+wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.6/DuetWebControl-SBC.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 sudo systemctl start klipper
 ```
@@ -96,7 +96,7 @@ sudo systemctl start klipper
 ##### if you want backwards compatibility to dwc 1:
 ```
 cd ~/sdcard/dwc2/web 
-wget https://github.com/chrishamm/DuetWebControl/releases/download/2.0.4/DuetWebControl-SD.zip
+wget https://github.com/chrishamm/DuetWebControl/releases/download/1.22.5/DuetWebControl-1.22.5.zip
 unzip DuetWebContro*.zip
 for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 ```
