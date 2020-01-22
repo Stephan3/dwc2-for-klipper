@@ -1077,7 +1077,6 @@ class web_dwc2:
 				self.sdcard.file_position = 0 											#	postions / size
 				self.sdcard.file_size = os.stat(fullpath).st_size
 			else:
-				import pdb; pdb.set_trace()
 				raise 'gcodefile' + fullpath + ' not found'
 
 		self.file_infos['running_file'] = self.rr_fileinfo('knackwurst').result()
@@ -1298,8 +1297,7 @@ class web_dwc2:
 		if self.bed_mesh:
 
 			hmap = []
-			self.configfile.getsection("virtual_sdcard").get("path", None)
-			z_matrix = self.bed_mesh.calibrate.probed_z_table
+			z_matrix = self.bed_mesh.z_mesh.mesh_matrix
 			mesh_data = self.bed_mesh.z_mesh				#	see def print_mesh in bed_mesh.py line 572
 
 			meane_ = round( calc_mean(z_matrix), 3)
@@ -1495,7 +1493,7 @@ class web_dwc2:
 
 		def calc_time(in_):
 			if in_ == -1: return in_
-			#import pdb; pdb.set_trace()
+
 			h_str = re.search(re.compile('(\d+(\s)?hours|\d+(\s)?h)'),in_)
 			m_str = re.search(re.compile('(([0-9]*\.[0-9]+)\sminutes|\d+(\s)?m)'),in_)
 			s_str = re.search(re.compile('(\d+(\s)?seconds|\d+(\s)?s)'),in_)
@@ -1522,13 +1520,11 @@ class web_dwc2:
 		for regex in slicers:
 			#	resource gunner ?
 			if re.compile(regex).search(pile):
-				#import pdb; pdb.set_trace()
 				meta['slicer'] = re.search(re.compile(regex),pile).group()
 				sl = slicers.index(regex)
 				break
 		#	only grab metadata if we found a slicer
 		if sl > -1 :
-			#import pdb; pdb.set_trace()
 			if objects_h[sl] != "":
 				try:
 					matches = re.findall(objects_h[sl], pile )
