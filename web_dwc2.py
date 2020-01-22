@@ -426,6 +426,10 @@ class web_dwc2:
 			"next": 0
 		}
 
+		#	whitespace uploads via nfs/samba
+		for file in os.listdir(path_):
+			os.rename(os.path.join(path_, file), os.path.join(path_, file.replace(' ', '_')))
+
 		#	if rrf is requesting directory, it has to be there.
 		if not os.path.exists(path_):
 			os.makedirs(path_)
