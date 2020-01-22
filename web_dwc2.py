@@ -441,7 +441,7 @@ class web_dwc2:
 				"type": "d" if os.path.isdir(el_path) else "f" ,
 				"name": str(el_) ,
 				"size": os.stat(el_path).st_size ,
-				"date": datetime.datetime.utcfromtimestamp( os.stat(el_path).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")
+				"date": datetime.datetime.fromtimestamp(os.stat(el_path).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
 			})
 
 		#	add klipper macros as virtual files
@@ -452,7 +452,7 @@ class web_dwc2:
 					"type": "f" ,
 					"name": macro_ ,
 					"size": 1 ,
-					"date": time.strftime("%Y-%m-%dT%H:%M:%S") 
+					"date": datetime.datetime.fromtimestamp(os.stat(el_path).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
 				})
 
 		#	virtual config file
@@ -462,7 +462,7 @@ class web_dwc2:
 				"type": "f",
 				"name": "config.g" ,
 				"size": os.stat(self.klipper_config).st_size ,
-				"date": datetime.datetime.utcfromtimestamp( os.stat(self.klipper_config).st_mtime ).strftime("%Y-%m-%dT%H:%M:%S")
+				"date": datetime.datetime.fromtimestamp(os.stat(el_path).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
 			})
 
 		return repl_
