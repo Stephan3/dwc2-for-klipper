@@ -1513,11 +1513,18 @@ class web_dwc2:
 
 			return dursecs
 
-		#	get 4k lines from file
+		#	read 20k bytes from each side
+		f_size = os.stat(path_).st_size
+		seek_amount = min( f_size , 20000 )
+
 		with open(path_, 'rb') as f:
-			cont_ = f.readlines()			#	gimme the whole file
-		int_ = cont_[:2000] + cont_[-2000:] 	# 	build up header and footer
-		pile = " ".join(int_)					#	build a big pile for regex
+			cont_ = f.readlines(seek_amount)        #    gimme the first chunk
+			f.seek(0, os.SEEK_END)                #     find the end
+			f.seek(seek_amount*-1,os.SEEK_CUR)        #    back up some
+			cont_ = cont_+ f.readlines()            #    read the remainder
+
+		pile = " ".join(cont_)
+
 		#	determine slicer
 		sl = -1
 
