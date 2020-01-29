@@ -82,7 +82,6 @@ class web_dwc2:
 	def handle_ready(self):
 		#	klippy related
 		self.current_tool = 0
-		self.bed_mesh = self.printer.lookup_object('bed_mesh', None)
 		self.chamber = self.printer.lookup_object('chamber', None)
 		self.heater_bed = self.printer.lookup_object('heater_bed', None)
 		self.fan = self.printer.lookup_object('fan', None)
@@ -149,7 +148,7 @@ class web_dwc2:
 		self.tornado.daemon = True
 		self.tornado.start()
 
-		dbg = threading.Thread( target=debug_console, args=(self,) )
+		#dbg = threading.Thread( target=debug_console, args=(self,) )
 		#dbg.start()
 	# the main webpage to serve the client browser itself
 	class dwc_handler(tornado.web.RequestHandler):
@@ -426,13 +425,13 @@ class web_dwc2:
 			"next": 0
 		}
 
-		#	whitespace uploads via nfs/samba
-		for file in os.listdir(path_):
-			os.rename(os.path.join(path_, file), os.path.join(path_, file.replace(' ', '_')))
-
 		#	if rrf is requesting directory, it has to be there.
 		if not os.path.exists(path_):
 			os.makedirs(path_)
+
+		#	whitespace uploads via nfs/samba
+		for file in os.listdir(path_):
+			os.rename(os.path.join(path_, file), os.path.join(path_, file.replace(' ', '_')))
 
 		#	append elements to files list matching rrf syntax
 		for el_ in os.listdir(path_):
@@ -462,7 +461,7 @@ class web_dwc2:
 				"type": "f",
 				"name": "config.g" ,
 				"size": os.stat(self.klipper_config).st_size ,
-				"date": datetime.datetime.fromtimestamp(os.stat(el_path).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
+				"date": datetime.datetime.fromtimestamp(os.stat(self.klipper_config).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
 			})
 
 		return repl_
@@ -1297,15 +1296,18 @@ class web_dwc2:
 			return sqrt(float(reduce(lambda x, y: x + y, map(lambda x: (x - mean) ** 2, matrix_tolist))) / len(matrix_tolist)) # Stackoverflow - liked that native short solution
 
 		#
+		bed_mesh = self.printer.lookup_object('bed_mesh', None)
 
-		if self.bed_mesh:
+		if bed_mesh.z_mesh:
 
 			hmap = []
-			z_matrix = self.bed_mesh.z_mesh.mesh_matrix
-			mesh_data = self.bed_mesh.z_mesh				#	see def print_mesh in bed_mesh.py line 572
+			z_matrix = bed_mesh.z_mesh.mesh_matrix
+			mesh_data = bed_mesh.z_mesh				#	see def print_mesh in bed_mesh.py line 572
 
 			meane_ = round( calc_mean(z_matrix), 3)
 			stdev_ = round( calc_stdv(z_matrix) , 3)
+
+			#import pdb; pdb.set_trace()
 
 			hmap.append( 'RepRapFirmware height map file v2 generated at ' + str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M')) + ', mean error ' + str(meane_) + ', deviation ' + str(stdev_))
 			hmap.append('xmin,xmax,ymin,ymax,radius,xspacing,yspacing,xnum,ynum')
@@ -1319,6 +1321,9 @@ class web_dwc2:
 				hmap.append( '  ' + ',  '.join( map(str, red_by_offset) ))
 
 			return hmap
+
+		else:
+			self.gcode.respond_info("Bed has not been probed")
 
 		return
 	#	delivering printer states, webif can use
