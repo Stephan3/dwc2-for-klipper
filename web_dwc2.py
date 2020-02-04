@@ -451,7 +451,7 @@ class web_dwc2:
 					"type": "f" ,
 					"name": macro_ ,
 					"size": 1 ,
-					"date": datetime.datetime.fromtimestamp(os.stat(el_path).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
+					"date": datetime.datetime.fromtimestamp(os.stat(self.klipper_config).st_mtime).strftime("%Y-%m-%dT%H:%M:%S")
 				})
 
 		#	virtual config file
