@@ -609,6 +609,7 @@ class web_dwc2:
 			} ,
 			"temps": {
 				"bed": { "active": 0 },
+				"state": [],
 				"extra": [{}],
 				"current": [],
 				"tools": {
