@@ -46,7 +46,7 @@ class web_dwc2:
 		self.reactor = self.printer.get_reactor()
 		self.gcode = self.printer.lookup_object('gcode')
 		self.configfile = self.printer.lookup_object('configfile').read_main_config()
-		self.stepper_enable = self.printer.try_load_module(config, "stepper_enable")
+		self.stepper_enable = self.printer.load_object(config, "stepper_enable")
 		#	gcode execution needs
 		self.gcode_queue = []	#	containing gcode user pushes from dwc2
 		self.gcode_reply = []	#	contains the klippy replys
