@@ -18,6 +18,7 @@ import time
 import util
 import shutil
 import serial
+import gcode as kgcode
 
 #
 class web_dwc2:
@@ -518,7 +519,7 @@ class web_dwc2:
 		while gcodes:
 
 			#	parse commands - still magic. Wheres the original function in klipper?
-			params = self.parse_params(gcodes.pop(0))
+			params, gcmd = self.parse_params(gcodes.pop(0))
 
 			#	defaulting to original
 			handover = params['#original']
@@ -533,8 +534,6 @@ class web_dwc2:
 			stat_ = self.get_printer_status()
 			if stat_ in [ 'P', 'D', 'R' ] and params['#command'] not in midprint_allow :
 				web_.write( json.dumps({'buff': 0, 'err': 0}) )
-				#self.set_popup(msg='<b>' + params['#command'] + " not allowed during Print.</b>")
-				#self.set_message(msg=params['#command'] + ' not allowed during print.')
 				continue
 
 			#	rewrite rrfs specials to klipper readable format
@@ -1019,9 +1018,7 @@ class web_dwc2:
 
 	#	rrf G10 command - set heaterstemp
 	def cmd_G10(self, params):
-
-		temp = max ( max( self.gcode.get_float('S', params, 0.), self.gcode.get_float('R', params, 0.) ), 0 )
-		command_ = str("M104 T%d S%0.2f" % ( int(params['P']), float(temp)) )
+		command_ = str("M104 T%d S%0.2f" % ( int(params['P']), int(params['S']) ) )
 		return command_
 	#	rrf M0 - cancel print from sd
 	def cmd_M0(self, params):
@@ -1127,20 +1124,18 @@ class web_dwc2:
 	#	set heatbed
 	def cmd_M140(self, params):
 
-		temp = max( self.gcode.get_float('S', params, 0.), 0)
-		command_ = str("M140 S%d" % ( int(temp)) )
+		command_ = str("M140 S%d" % ( int(params['S']) ) )
 		return command_
 	#	setting babysteps:
 	def cmd_M290(self, params):
 
 		if self.get_axes_homed()[2] == 0:
-			self.gcode_reply.append('!! Only idiots try to babystep withoung homing !!')
 			return 0
 
-		mm_step = self.gcode.get_float('Z', params, None)
-		if not mm_step: mm_step = self.gcode.get_float('S', params, None)	#	DWC 1 workarround
-		params = self.parse_params('SET_GCODE_OFFSET Z_ADJUST' + str(mm_step) + ' MOVE1')
-		self.gcode.cmd_SET_GCODE_OFFSET(params)
+		mm_step = float( params['Z'] )
+		#if not mm_step: mm_step = self.gcode.get('S', params, None)	#	DWC 1 workarround	<- probably broken
+		params, gcmd = self.parse_params('SET_GCODE_OFFSET Z_ADJUST' + str(mm_step) + ' MOVE1')
+		self.gcode.cmd_SET_GCODE_OFFSET(gcmd)
 		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
 
 		return 0
@@ -1181,35 +1176,11 @@ class web_dwc2:
 		if self.gcode.dwc_lock:
 			return
 
-		ack_needers = [ "G0", "G1", "G28", "G90", "G91", "M0", "M24", "M25", "M83", "M84", "M104", "M112", "M117", "M140", "M141", "DUMP_TMC", "FIRMWARE_RESTART", "SET_PIN", "STEPPER_BUZZ" ]
-		lowers = [ "DUMP_TMC", "ENDSTOP_PHASE_CALIBRATE", "FORCE_MOVE", "PID_CALIBRATE", "SET_HEATER_TEMPERATURE", "SET_PIN", "SET_PRESSURE_ADVANCE", "STEPPER_BUZZ" ]
+		handover = []
+		for command in self.gcode_queue:
+			handover.append(self.gcode_queue.pop(0))
+			self.gcode._process_commands(handover)
 
-		self.gcode.dwc_lock = self.gcode.is_processing_data = True
-
-		while self.gcode_queue:
-
-			handle_ = self.gcode_queue.pop(0)
-			params = self.parse_params(handle_)
-
-			if params['#command'] in lowers:
-				params = self.parse_params(handle_, low_=True)
-
-			try:
-				handler = self.gcode.gcode_handlers.get(params['#command'], self.gcode.cmd_default)
-				handler(params)
-			except Exception as e:
-				self.gcode_reply.append( "" )
-				logging.error( "failed: " + params['#command'] + str(e) )
-				#self.set_popup(msg=params['#command'] + ' resulted with: ' + str(e))
-				#self.set_message(msg="Warning: " + params['#command'] + ' resulted with: ' + str(e))
-				time.sleep(1)	#	not beautiful but webif ignores errors on button commands otherwise
-				self.gcode_reply.append( "!! " + str(e) + "\n" )
-			else:
-				logging.error( "passed: " + params['#command'] )
-				if params['#command'] in ack_needers or params['#command'] in self.klipper_macros:
-					self.gcode_reply.append( "" )	#	pseudo ack
-
-		self.gcode.dwc_lock = self.gcode.is_processing_data = False
 	#	launch individual pause macro
 	def pause_macro(self):
 		#	store old XYZ position somewhere ?
@@ -1230,29 +1201,29 @@ class web_dwc2:
 			self.reactor.register_callback(self.gcode_reactor_callback)
 	#	parses gcode commands into params -took from johns work
 	def parse_params(self, line, low_=False):
-		logging.error(line)
 		args_r = re.compile('([A-Z_]+|[A-Z*/])')
-		if low_:
-			line = origline = line.strip().lower()
-		else:
-			line = origline = line.strip()
+		# Ignore comments and leading/trailing spaces
+		line = origline = line.strip()
 		cpos = line.find(';')
 		if cpos >= 0:
 			line = line[:cpos]
-		# Break command into parts
-		parts = args_r.split(line.upper())[1:]
-		params = { parts[i]: parts[i+1].strip()
-					for i in range(0, len(parts), 2) }
-		params['#original'] = origline
-		if parts and parts[0] == 'N':
+		# Break line into parts and determine command
+		parts = args_r.split(line.upper())
+		numparts = len(parts)
+		cmd = ""
+		if numparts >= 3 and parts[1] != 'N':
+			cmd = parts[1] + parts[2].strip()
+		elif numparts >= 5 and parts[1] == 'N':
 			# Skip line number at start of command
-			del parts[:2]
-		if not parts:
-			# Treat empty line as empty command
-			parts = ['', '']
-		params['#command'] = cmd = parts[0] + parts[1].strip()
+			cmd = parts[3] + parts[4].strip()
+		# Build gcode "params" dictionary
+		params = { parts[i]: parts[i+1].strip() for i in range(1, numparts, 2) }
+		params['#original'] = origline
+		params['#command'] = parts[1] + parts[2].strip()
 
-		return params
+		gcmd = kgcode.GCodeCommand(self.gcode, cmd, origline, params, True)
+
+		return params, gcmd
 	#	launch individual resume macro
 	def resume_macro(self):
 
@@ -1344,7 +1315,7 @@ class web_dwc2:
 
 		state = 'I'
 
-		if 'Printer is ready' != self.printer.get_state_message():
+		if 'Printer is ready' != self.printer.get_state_message()[0]:
 			self.klipper_ready = False
 			return 'O'
 
