@@ -62,7 +62,7 @@ sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
 
 Maybe you´ll need to change the startup system for klipper to access ~/klipper/klippy/klippy.py
 
-##### On Octopi / Ubuntu / Debian (untested, feedback wanted)
+##### On Octopi / Ubuntu / Debian
 I asume here that you used the octopi install script from Kevins github.
 ```
 sudo apt install wget gzip tar
@@ -80,16 +80,11 @@ ${PYTHONDIR}/bin/pip install tornado==5.1.1
 git clone https://github.com/KevinOConnor/klipper.git
 git clone https://github.com/Stephan3/dwc2-for-klipper.git
 ln -s ~/dwc2-for-klipper/web_dwc2.py ~/klipper/klippy/extras/web_dwc2.py
-# make changes in klipper we need
-gcode=$(sed 's/self.bytes_read = 0/self.bytes_read = 0\n        self.respond_callbacks = []/g' klipper/klippy/gcode.py)
-gcode=$(echo "$gcode" | sed 's/# Response handling/def register_respond_callback(self, callback):\n        self.respond_callbacks.append(callback)/')
-gcode=$(echo "$gcode" | sed 's/os.write(self.fd, msg+"\\n")/os.write(self.fd, msg+"\\n")\n            for callback in self.respond_callbacks:\n                callback(msg+"\\n")/')
-echo "$gcode" > klipper/klippy/gcode.py
 
 mkdir -p ~/sdcard/dwc2/web
 mkdir -p ~/sdcard/sys
 cd ~/sdcard/dwc2/web 
-wget https://github.com/chrishamm/DuetWebControl/releases/download/2.1.6/DuetWebControl-SBC.zip
+wget https://github.com/Duet3D/DuetWebControl/releases/download/3.1.1/DuetWebControl-SD.zip
 unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 sudo systemctl start klipper
 ```
