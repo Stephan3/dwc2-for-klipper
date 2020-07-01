@@ -17,8 +17,8 @@ import re
 import time
 import util
 import shutil
-import serial
 import gcode as kgcode
+import serial
 
 #
 class web_dwc2:
@@ -33,7 +33,7 @@ class web_dwc2:
 		self.last_state = 'O'
 		self.popup = None
 		self.message = None
-		self.serial = serial.Serial('/tmp/printer', 250000, timeout=0.050)
+		self.serial = serial.Serial(config.get("serial_path", "/tmp/printer" ), 250000, timeout=0.050)
 		#	get config
 		self.config = config
 		self.adress = config.get( 'listen_adress', "127.0.0.1" )
@@ -46,6 +46,7 @@ class web_dwc2:
 		self.printer = config.get_printer()
 		self.reactor = self.printer.get_reactor()
 		self.gcode = self.printer.lookup_object('gcode')
+		self.gcode.respond_raw = self.respond_raw			#	make changes we need to gcode.py
 		self.configfile = self.printer.lookup_object('configfile').read_main_config()
 		self.stepper_enable = self.printer.load_object(config, "stepper_enable")
 		#	gcode execution needs
@@ -53,7 +54,6 @@ class web_dwc2:
 		self.gcode_reply = []	#	contains the klippy replys
 		self.klipper_macros = []
 		self.gcode.dwc_lock = False
-		self.gcode.register_respond_callback(self.gcode_response) #	if thers a gcode reply, phone me -> see fheilmans its missing in master
 		#	once klipper is ready start pre_flight function - not happy with this. If klipper fails to launch -> no web if?
 		self.printer.register_event_handler("klippy:ready", self.handle_ready)
 		self.printer.register_event_handler("klippy:disconnect", self.shutdown)
@@ -272,9 +272,6 @@ class web_dwc2:
 					self.write( json.dumps(self.repl_) )
 			except Exception as e:
 				logging.warn( "DWC2 - error in write: " + str(e) )
-			#	if noones consuming klippers serial data -> flush it
-			if self.web_dwc2.serial.in_waiting >= 2000:
-				self.web_dwc2.serial.reset_input_buffer()
 
 		def post(self, *args):
 
@@ -1180,7 +1177,6 @@ class web_dwc2:
 		for command in self.gcode_queue:
 			handover.append(self.gcode_queue.pop(0))
 			self.gcode._process_commands(handover)
-
 	#	launch individual pause macro
 	def pause_macro(self):
 		#	store old XYZ position somewhere ?
@@ -1242,6 +1238,7 @@ class web_dwc2:
 
 		if self.gcode_queue:
 			self.reactor.register_callback(self.gcode_reactor_callback)
+
 ##
 #	Helper functions getting/parsing data
 ##
@@ -1564,6 +1561,19 @@ class web_dwc2:
 		}
 
 		dict_.put(repl_)
+	#	function that overwrites klippers original
+	def respond_raw(self, msg):
+		if self.gcode.is_fileinput:
+			return
+		try:
+			#	prevent serial overflow if octoprint disconnects
+			if self.serial.in_waiting < 500:
+				os.write(self.gcode.fd, msg+"\n")
+			#	prevent reply overflow if user closes webif
+			if len(self.gcode_reply) < 100:
+				self.gcode_response(msg+"\n")
+		except os.error:
+			logging.exception("Write g-code response")
 	#	setting message
 	def set_message(self, msg='msg'):
 		self.message = {
