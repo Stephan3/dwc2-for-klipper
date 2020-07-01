@@ -118,7 +118,7 @@ class web_dwc2:
 	def dwc2(self):
 		def tornado_logger(req):
 			fressehaltn = []
-			fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply" ]
+			fressehaltn = [ "/favicon.ico", "/rr_status?type=1", "/rr_status?type=2", "/rr_status?type=3", "/rr_reply", "/rr_config" ]
 			values = [str(time.time())[-8:], req.request.remote_ip, req.request.method, req.request.uri]
 			if req.request.uri not in fressehaltn:
 				logging.info("DWC2:" + " - ".join(values))	#	bind this to debug later
@@ -1103,10 +1103,13 @@ class web_dwc2:
 	#	rrf M106 translation to klipper scale
 	def cmd_M106(self, params):
 
+		if float(params['S']) < 1.01:
+			command = str( params['#command'] + " S" + str(int( float(params['S']) * 255 )) )
+		else:
+			command = str( params['#command'] + " S" + str(int( float(params['S']) )) )
+
 		if float(params['S']) < .05:
 			command = str("M107")
-		else:
-			command = str( params['#command'] + " S" + str(int( float(params['S']) * 255 )) )
 
 		return command
 	#	fo ecxecuting m112 now!
