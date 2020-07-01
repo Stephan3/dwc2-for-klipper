@@ -112,7 +112,3 @@ listen_port: 4750
 #	optional defaulting to dwc2/web. Its a folder relative to your virtual sdcard.
 web_path: dwc2/web
 ```
-
-## Fix missing stuff in klipper today
-A Gcode callback and ack system is missing in klippy today for other objects than the serial. You need to use my klipper fork or patch the few lines by hand in gcode.py.
-See https://github.com/KevinOConnor/klipper/pull/1290
