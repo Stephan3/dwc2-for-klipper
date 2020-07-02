@@ -1133,12 +1133,9 @@ class web_dwc2:
 			return 0
 
 		mm_step = float( params['Z'] )
-		#if not mm_step: mm_step = self.gcode.get('S', params, None)	#	DWC 1 workarround	<- probably broken
-		params, gcmd = self.parse_params('SET_GCODE_OFFSET Z_ADJUST' + str(mm_step) + ' MOVE1')
-		self.gcode.cmd_SET_GCODE_OFFSET(gcmd)
-		self.gcode_reply.append('Z adjusted by %0.2f' % mm_step)
+		command_ = 'SET_GCODE_OFFSET Z_ADJUST=' + str(mm_step) + ' MOVE=1'
 
-		return 0
+		return command_
 	#	Ok button in DWC webif
 	def cmd_M292(self, params):
 		self.popup = None
@@ -1319,7 +1316,7 @@ class web_dwc2:
 			self.klipper_ready = False
 			return 'O'
 
-		if self.gcode.is_processing_data:
+		if self.gcode.is_processing_data or self.gcode.get_status()['busy']:
 			state = 'B'
 
 		if self.sdcard.current_file:
