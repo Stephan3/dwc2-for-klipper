@@ -30,7 +30,6 @@ class web_dwc2:
 	def __init__(self, config):
 
 		self.klipper_ready = False
-		self.last_state = 'O'
 		self.popup = None
 		self.message = None
 		self.serial = serial.Serial(config.get("serial_path", "/tmp/printer" ), 250000, timeout=0.050)
@@ -493,6 +492,7 @@ class web_dwc2:
 			'G10': self.cmd_G10 ,		#	set heaters temp
 			'M0': self.cmd_M0 ,			#	cancel SD print
 			'M24': self.cmd_M24 ,		#	resume sdprint
+			'M25': self.cmd_M25 ,		#	pause print
 			'M32': self.cmd_M32 ,		#	Start sdprint
 			'M98': self.cmd_M98 ,		#	run macro
 			'M106': self.cmd_M106 ,		#	set fan
@@ -1051,8 +1051,11 @@ class web_dwc2:
 				"filament": self.file_infos.get('running_file', {}).get( "filament", 1)
 			}
 			self.reactor.register_callback(self.update_printdata, waketime=self.reactor.monotonic() + 2)
-		self.sdcard.cmd_M24(params)
-		return 0
+		return 'M24'
+	#	rrf M25 - pause print
+	def cmd_M25(self, params):
+		self.sdcard.do_pause()
+		self.pause_macro()
 	#	rrf M32 - start print from sdcard
 	def cmd_M32(self, params):
 
@@ -1325,11 +1328,6 @@ class web_dwc2:
 			elif self.sdcard.current_file and self.sdcard.work_timer:
 				state = 'P'
 
-		#	handle switching from pausing/processing to paused
-		if (self.last_state == 'D' or self.last_state == 'P') and state == 'S':
-				self.pause_macro()
-
-		self.last_state = state
 		return state
 	#	import klipper macros as virtual files
 	def get_klipper_macros(self):
