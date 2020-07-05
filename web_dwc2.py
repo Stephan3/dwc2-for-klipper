@@ -52,7 +52,7 @@ class web_dwc2:
 		self.gcode_queue = []	#	containing gcode user pushes from dwc2
 		self.gcode_reply = []	#	contains the klippy replys
 		self.klipper_macros = []
-		self.gcode.dwc_lock = False
+		self.mutex = self.reactor.mutex()
 		#	once klipper is ready start pre_flight function - not happy with this. If klipper fails to launch -> no web if?
 		self.printer.register_event_handler("klippy:ready", self.handle_ready)
 		self.printer.register_event_handler("klippy:disconnect", self.shutdown)
@@ -515,7 +515,7 @@ class web_dwc2:
 		#	start to prepare commands
 		while gcodes:
 
-			#	parse commands - still magic. Wheres the original function in klipper?
+			#	parse commands
 			params, gcmd = self.parse_params(gcodes.pop(0))
 
 			#	defaulting to original
@@ -546,7 +546,7 @@ class web_dwc2:
 
 		web_.write( json.dumps({'buff': 1, 'err': 0}) )
 		web_.finish()
-		self.reactor.register_callback(self.gcode_reactor_callback)
+		self.reactor.register_callback(self.gcode_reactor_callback,waketime=self.reactor.monotonic() + 0.1)
 	#	dwc rr_move - backup printer.cfg
 	def rr_move(self, web_):
 
@@ -1172,14 +1172,14 @@ class web_dwc2:
 		self.gcode_reply.append(msg)
 	#	recall for gcode ecxecution is needed ( threadsafeness )
 	def gcode_reactor_callback(self, eventtime):
-		#	if user adds commands return the callback
-		if self.gcode.dwc_lock:
-			return
 
-		handover = []
-		for command in self.gcode_queue:
-			handover.append(self.gcode_queue.pop(0))
-			self.gcode._process_commands(handover)
+		handover = self.gcode_queue
+		self.gcode_queue = []
+
+		with self.mutex:
+			self.gcode._process_commands( handover )
+
+		return eventtime
 	#	launch individual pause macro
 	def pause_macro(self):
 		#	store old XYZ position somewhere ?
