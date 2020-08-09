@@ -1273,7 +1273,8 @@ class web_dwc2:
 		if bed_mesh.z_mesh:
 
 			hmap = []
-			z_matrix = bed_mesh.z_mesh.mesh_matrix
+			#z_matrix = bed_mesh.z_mesh.mesh_matrix
+			z_matrix = bed_mesh.z_mesh.probed_matrix
 			mesh_data = bed_mesh.z_mesh				#	see def print_mesh in bed_mesh.py line 572
 
 			meane_ = round( calc_mean(z_matrix), 3)
