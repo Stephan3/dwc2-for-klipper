@@ -44,6 +44,7 @@ class web_dwc2:
 		self.printer = config.get_printer()
 		self.reactor = self.printer.get_reactor()
 		self.gcode = self.printer.lookup_object('gcode')
+		self.gcode_io = self.printer.lookup_object("gcode_io")
 		self.configfile = self.printer.lookup_object('configfile').read_main_config()
 		self.stepper_enable = self.printer.load_object(config, "stepper_enable")
 		#	gcode execution needs
@@ -1318,8 +1319,8 @@ class web_dwc2:
 			self.klipper_ready = False
 			return 'O'
 
-		#if self.gcodeio.is_processing_data: or self.gcode.get_status()['busy']:
-		#	state = 'B'
+		if self.gcode_io.is_processing_data:
+			state = 'B'
 
 		if self.sdcard.current_file:
 			if self.sdcard.must_pause_work:
