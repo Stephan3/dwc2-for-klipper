@@ -1,29 +1,30 @@
 # dwc2-for-klipper
-A translator between DWC2 and Klipper
+
+A translator between [DWC2](https://github.com/Duet3D/DuetWebControl) and Klipper
 
 ![Alt text](screenshots/screen_1.PNG?raw=true "screen 1")
 ![Alt text](screenshots/screen_2.PNG?raw=true "screen 2")
 
 ## What works
 
-* printing from klippers virtual sdcard
+* printing from Klipper's virtual sdcard
 * pause / cancel prints (resume?)
-* babystepping feature using klippers ```SET_GCODE_OFFSET Z_ADJUST```
-* editing klippers configuration. Its displayed as config.g in system section. So the webif restarts klipper after saving.
+* babystepping feature using Klipper's ```SET_GCODE_OFFSET Z_ADJUST```
+* editing Klipper's configuration. Its displayed as `config.g` in system section. So the web interface restarts Klipper after saving.
 * Klipper macros are imported as virtual files and can be accesed from the dashboard
 * uploads and downloads of gcodes
-* gcode analysis using regex to determine duration / layerhighth / firstlayer / filamentusage and other
+* gcode analysis using regex to determine duration / layerhight / firstlayer / filamentusage and others
 * the math for printtime left based on whatever, showing layerhistory, detecting layerchanges etc. (needs working slicer regex)
-* settings of webinterface are saved and loded correctly
+* settings of web interface are saved and loaded correctly
 * homing / extruding / moving
 * heater control
-* setting fanspeed / extrusionmultipler / speedfactor during print in statuswindow
-* Heightmap is working. (needs manual ```BED_MESH_CALIBATE```) It is kept only for displaying, even after ```BED_MESH_CLEAR```
+* setting fanspeed / extrusionmultiplier / speedfactor during print in status window
+* heightmap is working (needs manual `BED_MESH_CALIBATE`). It is kept only for displaying, even after `BED_MESH_CLEAR`
 * webcam integration works now
-  * with mjpeg-streamer add the streaming url to settings. example: http://192.168.2.20:8080/?action=stream
-  * With youtube live https://webcam.io/support/howto-embed-youtube-live/
-* pause/resume/cancel macros are working now - see Things you should know
-* plugin for Cura 4.0 does work, just enter url for example: http://192.168.2.188:4750/
+  * with mjpeg-streamer add the streaming URL to settings; example: http://192.168.2.20:8080/?action=stream
+  * With YouTube Live; example: https://webcam.io/support/howto-embed-youtube-live/
+* pause/resume/cancel macros are working now - see Things You Should Know below
+* plugin for Cura 4.0 does work, just enter URL; for example: http://192.168.2.188:4750/
 
 ## What is not working
 
@@ -35,40 +36,45 @@ A translator between DWC2 and Klipper
   * can we calc this? movelength/junction/acceleration is there
 * ~~cancel/pause/resume macros. I will do this soon~~
 * ~~rrf/dwc cura plugin~~
-* ......
+* ...
 
 ## Things you should know
 
-* Klipper messages are marked as warnings.(yellow)
-  * Noramly klipper knows ok and error
-* Klippers printer.cfg is displayed as a virtual file (config.g) in System section
-  * restart after conf edits works
-* The macros you define in printer.cfg are displayed as virtual files wthin DWCs macros
+* Klipper messages are marked as warnings (yellow).
+  * Normaly Klipper knows ok and error
+* Klipper's `printer.cfg` is displayed as a virtual file (`config.g`) in system section
+  * restart after configuration edits works
+* The macros you define in `printer.cfg` are displayed as virtual files wthin DWC's macros
 * For pause and resume macros you can use:
-  * kliper gcode macros pause_print resume_print cancel_print (not case sensitive)
-  * dwc macros pause.g resume.g cacnel.g - this is in line with rrf
-  * dwc macros are overriding klippers
-* ....
+  * Klipper gcode macros `pause_print`, `resume_print`, `cancel_print` (not case sensitive)
+  * DWC macros `pause.g`, `resume.g`, `cancel.g` - this is in line with RRF
+  * DWC macros are overriding Klipper's macros
+* ...
 
 ## Installation
 
-### Prerequirements
-python2, tornado, gunzip, unzip, wget
+### Prerequisites
 
-##### On arch:
+Python 2, Tornado, gunzip, unzip and wget.
+
+#### On ArchLinux:
+
 ```
-sudo pacman -Sy && pacman -S python2 python2-tornado wget gunzip
+sudo pacman -Syu python2 python2-tornado wget gzip
 ```
 
-Maybe you´ll need to change the startup system for klipper to access ~/klipper/klippy/klippy.py
+Maybe you´ll need to change the startup system for Klipper to access `~/klipper/klippy/klippy.py`.
 
-##### On Octopi / Ubuntu / Debian
-I asume here that you used the octopi install script from Kevins github.
+#### On Debian-based systems such as Octopi or Ubuntu:
+
+I asume here that you used the Octopi install script from Kevin's GitHub repository.
+
 ```
 sudo apt install wget gzip tar
 ```
 
 Then switch to your klipper user and:
+
 ```
 sudo systemctl stop klipper
 cd ~
@@ -89,7 +95,8 @@ unzip *.zip && for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 sudo systemctl start klipper
 ```
 
-##### if you want backwards compatibility to dwc 1:
+#### If you want backwards compatibility to DWC1:
+
 ```
 cd ~/sdcard/dwc2/web 
 wget https://github.com/chrishamm/DuetWebControl/releases/download/1.22.5/DuetWebControl-1.22.5.zip
@@ -98,6 +105,7 @@ for f_ in $(find . | grep '.gz');do gunzip ${f_};done
 ```
 
 ### Klipper config example:
+
 ```
 [virtual_sdcard]
 path: /home/pi/sdcard
