@@ -1,4 +1,5 @@
-# this is only here for refference. please use:
+# DO NOT USE THIS ANYMORE!
+# This is only here for refference. please use:
 [Socket version](https://github.com/Stephan3/dwc2-for-klipper-socket)
 
 
